@@ -10,6 +10,12 @@ export default function Home() {
         <li>
           <code>GET /api/catalog</code> — read the latest snapshot and fitment review list
         </li>
+        <li>
+          <code>POST /api/chat</code> — grounded product chat (streaming)
+        </li>
+        <li>
+          <code>/widget-demo</code> — local embed demo for the storefront widget
+        </li>
       </ul>
     </main>
   );

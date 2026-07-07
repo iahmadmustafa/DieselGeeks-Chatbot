@@ -5,7 +5,8 @@
   "description": "Retrieval-grounded product chat assistant for dieselgeeks.com.au",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build:widget": "node widget/build.mjs",
+    "build": "npm run build:widget && next build",
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -22,6 +23,7 @@
   "license": "UNLICENSED",
   "dependencies": {
     "@ai-sdk/openai": "^4.0.8",
+    "@ai-sdk/react": "^4.0.17",
     "@upstash/redis": "^1.38.0",
     "ai": "^7.0.16",
     "next": "^15.5.20",
@@ -32,6 +34,7 @@
   "devDependencies": {
     "@types/node": "^26.1.0",
     "@types/react": "^19.2.17",
+    "esbuild": "^0.28.1",
     "tsx": "^4.23.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"

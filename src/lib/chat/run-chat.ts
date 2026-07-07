@@ -41,7 +41,14 @@ export async function runChat(options: {
   messages: ChatUIMessage[];
   sessionId: string;
 }): Promise<ReadableStream> {
-  const snapshot = await getSnapshot();
+  let snapshot;
+  try {
+    snapshot = await getSnapshot();
+  } catch (error) {
+    console.error("[run-chat] snapshot read failed", error);
+    throw new Error("Catalog snapshot is temporarily unavailable");
+  }
+
   if (!snapshot) {
     throw new Error("Catalog snapshot is not available. Run /api/sync first.");
   }
@@ -65,53 +72,63 @@ export async function runChat(options: {
     },
   });
 
+  const userPreview = previewText(
+    trimmedMessages
+      .filter((message) => message.role === "user")
+      .map((message) =>
+        message.parts
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join(""),
+      )
+      .at(-1) ?? "",
+  );
+
   const stream = createUIMessageStream<ChatUIMessage>({
     originalMessages: trimmedMessages as ChatUIMessage[],
+    onError: (error) => {
+      console.error("[run-chat] stream error", error);
+      return error instanceof Error ? error.message : "Chat stream failed";
+    },
     execute: async ({ writer }) => {
-      const result = streamText({
-        model: createChatModel(),
-        system: buildSystemPrompt(catalogScope),
-        messages: await convertToModelMessages(trimmedMessages, { tools }),
-        tools,
-        stopWhen: stepCountIs(5),
-        maxOutputTokens: getChatMaxOutputTokens(),
-        providerOptions: {
-          openai: {
-            reasoningEffort: "low",
-            reasoningSummary: null,
+      try {
+        const result = streamText({
+          model: createChatModel(),
+          system: buildSystemPrompt(catalogScope),
+          messages: await convertToModelMessages(trimmedMessages, { tools }),
+          tools,
+          stopWhen: stepCountIs(5),
+          maxOutputTokens: getChatMaxOutputTokens(),
+          providerOptions: {
+            openai: {
+              reasoningEffort: "low",
+              reasoningSummary: null,
+            },
           },
-        },
-        onStepEnd: ({ text }) => {
-          if (text) {
-            assistantText += text;
-          }
-        },
-      });
-
-      writer.merge(result.toUIMessageStream());
-      await result.consumeStream();
-
-      if (collectedProducts.length > 0) {
-        writer.write({
-          type: "data-products",
-          data: collectedProducts,
+          onStepEnd: ({ text }) => {
+            if (text) {
+              assistantText += text;
+            }
+          },
         });
+
+        writer.merge(result.toUIMessageStream());
+        await result.consumeStream();
+
+        if (collectedProducts.length > 0) {
+          writer.write({
+            type: "data-products",
+            id: "products",
+            data: collectedProducts,
+          });
+        }
+      } catch (error) {
+        console.error("[run-chat] execute failed", error);
+        throw error;
       }
     },
-    onEnd: async () => {
-      const userPreview = previewText(
-        trimmedMessages
-          .filter((message) => message.role === "user")
-          .map((message) =>
-            message.parts
-              .filter((part) => part.type === "text")
-              .map((part) => part.text)
-              .join(""),
-          )
-          .at(-1) ?? "",
-      );
-
-      await appendConversationLog({
+    onEnd: () => {
+      void appendConversationLog({
         session_id: options.sessionId,
         timestamp: new Date().toISOString(),
         user_message_preview: userPreview,
@@ -119,6 +136,8 @@ export async function runChat(options: {
         lookup_hits: 0,
         lookup_misses: searchCalls.length,
         assistant_text_preview: previewText(assistantText),
+      }).catch((error) => {
+        console.error("[run-chat] conversation log failed", error);
       });
     },
   });

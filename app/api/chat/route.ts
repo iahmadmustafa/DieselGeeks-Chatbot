@@ -78,6 +78,7 @@ export async function POST(request: Request): Promise<Response> {
       headers: buildCorsHeaders(request),
     });
   } catch (error) {
+    console.error("[api/chat] request failed", error);
     const message = error instanceof Error ? error.message : "Chat request failed";
     const status = message.includes("Catalog snapshot") ? 503 : 500;
     return jsonError(message, status, request);

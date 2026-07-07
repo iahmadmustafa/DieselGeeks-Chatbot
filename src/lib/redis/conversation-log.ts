@@ -25,12 +25,17 @@ function getRedis(): Redis {
 }
 
 export async function appendConversationLog(entry: ConversationLogEntry): Promise<void> {
-  const redis = getRedis();
-  const key = `${LOG_KEY_PREFIX}${entry.session_id}`;
+  try {
+    const redis = getRedis();
+    const key = `${LOG_KEY_PREFIX}${entry.session_id}`;
 
-  await redis.lpush(key, entry);
-  await redis.ltrim(key, 0, MAX_ENTRIES_PER_SESSION - 1);
-  await redis.expire(key, LOG_TTL_SECONDS);
+    await redis.lpush(key, entry);
+    await redis.ltrim(key, 0, MAX_ENTRIES_PER_SESSION - 1);
+    await redis.expire(key, LOG_TTL_SECONDS);
+  } catch (error) {
+    console.error("[conversation-log] append failed", error);
+    throw error;
+  }
 }
 
 export async function getConversationLog(sessionId: string): Promise<ConversationLogEntry[]> {

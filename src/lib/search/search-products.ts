@@ -22,6 +22,27 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function sanitizeDisplayText(value: string | null | undefined, maxLength = 240): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const cleaned = stripHtml(value)
+    .replace(/\uFFFD/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) {
+    return null;
+  }
+
+  return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength)}…` : cleaned;
+}
+
+function isUsableYearRangeKey(key: string): boolean {
+  return !/[<>]/.test(key) && key.trim().length > 0 && key.length <= 80;
+}
+
 export function buildFitmentSummary(product: CatalogProduct): string | null {
   if (!product.fitment_expected) {
     return null;
@@ -40,7 +61,9 @@ export function buildFitmentSummary(product: CatalogProduct): string | null {
     parts.push(`Engine: ${fitment.engine_codes.join(", ")}`);
   }
 
-  const yearEntries = Object.entries(fitment.year_ranges);
+  const yearEntries = Object.entries(fitment.year_ranges).filter(([model]) =>
+    isUsableYearRangeKey(model),
+  );
   if (yearEntries.length > 0) {
     const years = yearEntries
       .map(([model, range]) => `${model}: ${range.from}–${range.to}`)
@@ -49,21 +72,16 @@ export function buildFitmentSummary(product: CatalogProduct): string | null {
   }
 
   if (parts.length > 0) {
-    return parts.join(". ");
+    return sanitizeDisplayText(parts.join(". "));
   }
 
-  const stripped = stripHtml(product.fitment_raw);
-  if (!stripped) {
-    return null;
-  }
-
-  return stripped.length > 200 ? `${stripped.slice(0, 200)}…` : stripped;
+  return sanitizeDisplayText(product.fitment_raw, 200);
 }
 
 export function toProductCard(product: CatalogProduct): ProductCard {
   return {
     id: product.id,
-    title: product.title,
+    title: sanitizeDisplayText(product.title, 300) ?? product.title,
     price: product.price,
     sale_price: product.sale_price,
     stock_status: product.stock_status,

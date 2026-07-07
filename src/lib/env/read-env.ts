@@ -154,23 +154,37 @@ export function getContactUrl(): string {
 
 export function getAllowedOrigins(): string[] {
   const configured = readEnvLocalValue("ALLOWED_ORIGINS") ?? readEnv("ALLOWED_ORIGINS");
+  let origins: string[];
+
   if (configured) {
-    return configured
+    origins = configured
       .split(",")
       .map((origin) => origin.trim())
       .filter(Boolean);
-  }
-
-  const storeUrl = readEnv("WOOCOMMERCE_URL");
-  if (storeUrl) {
-    try {
-      return [new URL(storeUrl).origin];
-    } catch {
-      return [];
+  } else {
+    const storeUrl = readEnv("WOOCOMMERCE_URL");
+    if (storeUrl) {
+      try {
+        origins = [new URL(storeUrl).origin];
+      } catch {
+        origins = [];
+      }
+    } else {
+      origins = [];
     }
   }
 
-  return [];
+  if (process.env.NODE_ENV === "development") {
+    const localDevOrigins = [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://127.0.0.1:3000",
+      "http://127.0.0.1:3001",
+    ];
+    return [...new Set([...origins, ...localDevOrigins])];
+  }
+
+  return origins;
 }
 
 export function getFitmentLlmReasoningEffort(): FitmentLlmReasoningEffort {
