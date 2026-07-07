@@ -104,6 +104,75 @@ const FITMENT_REASONING_EFFORTS = [
 
 export type FitmentLlmReasoningEffort = (typeof FITMENT_REASONING_EFFORTS)[number];
 
+export function getChatModel(): string {
+  return readEnvLocalValue("CHAT_MODEL") ?? readEnv("CHAT_MODEL") ?? "gpt-5-mini";
+}
+
+export function getChatMaxOutputTokens(): number {
+  const configured = Number(
+    readEnvLocalValue("CHAT_MAX_OUTPUT_TOKENS") ?? readEnv("CHAT_MAX_OUTPUT_TOKENS") ?? "800",
+  );
+  if (Number.isNaN(configured) || configured < 100) {
+    return 800;
+  }
+  return Math.min(configured, 4000);
+}
+
+export function getChatMaxMessageLength(): number {
+  const configured = Number(
+    readEnvLocalValue("CHAT_MAX_MESSAGE_LENGTH") ?? readEnv("CHAT_MAX_MESSAGE_LENGTH") ?? "500",
+  );
+  if (Number.isNaN(configured) || configured < 50) {
+    return 500;
+  }
+  return Math.min(configured, 2000);
+}
+
+export function getChatMaxHistoryMessages(): number {
+  const configured = Number(
+    readEnvLocalValue("CHAT_MAX_HISTORY_MESSAGES") ?? readEnv("CHAT_MAX_HISTORY_MESSAGES") ?? "20",
+  );
+  if (Number.isNaN(configured) || configured < 2) {
+    return 20;
+  }
+  return Math.min(configured, 50);
+}
+
+export function getContactUrl(): string {
+  const configured = readEnvLocalValue("CONTACT_URL") ?? readEnv("CONTACT_URL");
+  if (configured) {
+    return configured;
+  }
+
+  const storeUrl = readEnv("WOOCOMMERCE_URL");
+  if (storeUrl) {
+    return `${storeUrl.replace(/\/$/, "")}/contact-us/`;
+  }
+
+  return "https://dieselgeeks.com.au/contact-us/";
+}
+
+export function getAllowedOrigins(): string[] {
+  const configured = readEnvLocalValue("ALLOWED_ORIGINS") ?? readEnv("ALLOWED_ORIGINS");
+  if (configured) {
+    return configured
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean);
+  }
+
+  const storeUrl = readEnv("WOOCOMMERCE_URL");
+  if (storeUrl) {
+    try {
+      return [new URL(storeUrl).origin];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
 export function getFitmentLlmReasoningEffort(): FitmentLlmReasoningEffort {
   const configured =
     readEnvLocalValue("FITMENT_LLM_REASONING_EFFORT") ??
