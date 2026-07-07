@@ -2,7 +2,7 @@
 
 **Project:** Retrieval-grounded product chat assistant for dieselgeeks.com.au
 **Site:** WordPress + WooCommerce (Mobex child theme), 76 published products, ~130 visitors/day
-**Status:** Proposed - awaiting team lead sign-off before build
+**Status:** Phase 1 complete on staging; Phase 2+ awaiting build
 **Date:** July 2026
 
 ---
@@ -94,7 +94,11 @@ One-time change on the WordPress side: a small `functions.php` snippet using `re
 
 - 76 products is tiny (whole compacted catalog is roughly 15-25k tokens). Queries are dominated by exact identifiers (part numbers, "4JJ1", "D-Max") where structured matching beats semantic search - fuzzy matching would add failure modes, not recall.
 - **No vector database (no Pinecone/pgvector).** If this comes up in review: it is over-engineering at this catalog size and can be revisited if the catalog grows 50x.
-- Search fields: part number/SKU, title, normalized fitment (make, models, engine codes, year ranges), category, description keywords.
+- Search fields: part number/SKU, title, normalized fitment (make, models, engine codes, year ranges), category, short description keywords, and **stripped `fitment_raw` text** (see Phase 2 keyword fallback).
+- **Fitment-required vs non-fitment products:** not every catalog item is a vehicle part. T-shirts, merch, and gift bundles (e.g. Xmas injector bundles sold as promotional packages) legitimately have **no** vehicle/engine compatibility and do not need fitment data. The system must distinguish:
+  - **Fitment not expected** — searchable via title, short description, and category only; empty fitment is correct, never flagged as an error, never excluded from results for lacking fitment.
+  - **Fitment expected but missing/malformed** — actual parts (injectors, fuel lines, valves, pumps, SCVs, etc.) where empty or unstructured fitment is a content gap worth flagging for the review list.
+  - Phase 1 sync should derive a `fitment_expected` flag per product (from WooCommerce categories and title/category heuristics — e.g. apparel/merch categories, "T-shirt", "bundle", "Xmas Special" in title). Human review of the initial 76-product audit can correct misclassifications. This flag drives review-list filtering and Phase 2 search behaviour.
 
 ### 4.4 Chat shape: single tool-calling loop, not a hardcoded two-call pipeline
 
@@ -129,22 +133,29 @@ One-time change on the WordPress side: a small `functions.php` snippet using `re
    - Fetch all products via WooCommerce REST (read-only API key), **published only - the 35 drafts are excluded from the index**.
    - Capture: id, SKU, title, price, sale price, stock status, categories, permalink, image URL, short description, fitment raw text.
    - **Fitment normalization:** parse each `mobex_child_fitment_info` value into structured JSON (`{ makes: [], models: [], engine_codes: [], fuel_system, year_ranges: {model: [from, to]} , notes }`). Parsing strategy: deterministic parser for the known `Key: value` line format first; a cheap LLM call as fallback for entries the parser cannot handle (run only when a product's fitment text changes, cached by content hash - not on every sync).
-   - **Flag products that fail to parse** into a review list we hand to the client/content team. This is expected: free-text fields maintained by hand over years will have typos, missing lines, and inconsistent year formats. **This normalization pass is where the real answer quality of the bot is decided** - budget real time for a one-time audit of all 76 records.
+   - **Flag products that fail to parse** into a review list we hand to the client/content team — **only where `fitment_expected` is true** (see Section 4.3). Merch, apparel, and gift bundles with empty fitment are not parse failures and must not appear on the review list. This is expected: free-text fields maintained by hand over years will have typos, missing lines, and inconsistent year formats on genuine parts. **This normalization pass is where the real answer quality of the bot is decided** - budget real time for a one-time audit of all 76 records.
    - Write snapshot to Redis under a versioned key; chat requests read the latest snapshot (fast, consistent across function instances).
-3. **Deliverable / checkpoint:** a dump of all 76 normalized fitment records reviewed by a human before Phase 2 starts.
+3. **Deliverable / checkpoint:** a dump of all 76 normalized fitment records reviewed by a human before Phase 2 starts. Parse failures flagged for content-team cleanup are expected; they do not block Phase 2, because `search_products` will fall back to stripped `fitment_raw` keyword matching for retrieval.
 
 ### Phase 2 - Chat backend
 
 **Goal:** `POST /api/chat` that answers product questions grounded in the snapshot.
 
 1. Chat loop with the Vercel AI SDK: system prompt + conversation history + `search_products` tool.
-2. `search_products` implementation: normalized structured matching over the snapshot (case/whitespace-insensitive; part-number match wins outright; make/model/engine-code filters combine; keyword fallback over title/description). Returns top N matches with real price/stock/permalink/image.
+2. **`search_products` implementation** — layered matching over the snapshot (case/whitespace-insensitive). Returns top N matches with real price/stock/permalink/image. Match priority:
+   1. **SKU / part-number exact match** — wins outright when the query contains a part number.
+   2. **Structured fitment filters** — make, model, engine code, and year against normalized `fitment` fields (from Phase 1 parsing).
+   3. **Keyword fallback** — when structured filters miss or return no results, search across **`title` + `short_description` + stripped `fitment_raw`** (HTML tags removed at search time, same stripping approach as Phase 1 LLM fitment parsing). This is required so products with real-but-unstructured fitment text (~15 on staging, flagged in the Phase 1 review list) remain findable even when normalized `fitment` is empty and before the content team cleans up fitment fields.
+   - Products with `fitment_parse_error` set are **not** excluded from the search index; `fitment_raw` is always searchable.
+   - **Non-fitment products** (`fitment_expected: false`): searchable via title, short description, and category only. Vehicle/engine fitment filters do not apply; empty fitment is not surfaced as an error in tool results or chat replies. Example queries: "diesel tuner t-shirt", "xmas bundle".
+   - **Fitment-expected products** (`fitment_expected: true`): use the full layered search above. Missing or failed fitment parse may be noted in internal review tooling but does not block the product from search (keyword fallback over `fitment_raw` still applies).
+   - Keyword matching is substring/token-based over the concatenated searchable text, not semantic embeddings.
 3. **System prompt grounding rules (the accuracy contract):**
    - Only state product names, prices, stock, and fitment that appear in tool results. Never estimate or recall prices/fitment from general knowledge.
    - VIN/chassis number given but no direct match possible -> ask a clarifying question (engine code or build year), never guess. (We have no VIN decode database; see Future Upgrades.)
    - **Dead-end fallback:** if search finds nothing and one clarifying exchange does not resolve it, hand off - "we may still be able to help, contact us" with a link to the store's contact/enquiry page. Never invent an answer to avoid saying "not found".
    - Out-of-stock products are shown honestly as out of stock, never hidden or misrepresented.
-   - Every fitment answer carries a short disclaimer: "please confirm fitment for your exact vehicle before ordering" (cheap liability insurance; also shown in the widget footer).
+   - Every fitment answer carries a short disclaimer: "please confirm fitment for your exact vehicle before ordering" (cheap liability insurance; also shown in the widget footer). **Omit fitment disclaimer and fitment summary on non-fitment products** (merch, apparel, bundles) — show title/price/stock only.
    - Stay on topic: diesel parts, fitment, orders, store info only. Politely refuse general-purpose requests (essay writing, coding, etc.).
 4. Response contract to the widget: streamed text plus a structured `products` array (id, title, price, stock status, image, permalink) so the frontend renders real cards rather than parsing prose.
 5. **Conversation logging from day one:** store transcripts in Redis (anonymized - session id, no PII), with searched terms and result counts. This is how we find retrieval failures after launch and how we show the client the bot is generating leads.
@@ -167,7 +178,7 @@ One-time change on the WordPress side: a small `functions.php` snippet using `re
 
 ### Phase 5 - Testing and launch
 
-1. **Golden test set before launch:** ~20-30 real queries with known correct answers, including the failure case that killed AI Engine ("4JJ1 +30 injectors pre-DPF" must return $3,168 and 2007-2016), part-number lookups, model/year queries, a VIN query (must ask a clarifying question), an off-topic request (must refuse), and a no-match query (must hand off, not guess).
+1. **Golden test set before launch:** ~20-30 real queries with known correct answers, including the failure case that killed AI Engine ("4JJ1 +30 injectors pre-DPF" must return $3,168 and 2007-2016), part-number lookups, model/year queries, a VIN query (must ask a clarifying question), an off-topic request (must refuse), a no-match query (must hand off, not guess), and **at least one query that matches a product via keyword search over stripped `fitment_raw`** where normalized fitment is empty (e.g. a product with HTML fitment like "Isuzu MUX" / "1KZ-TE" in `fitment_raw` but no structured parse — must still appear in results).
 2. Staging test on the existing staging site first; client walkthrough; then production.
 3. Week-one review of conversation logs for retrieval failures; tune search and fitment data accordingly.
 
@@ -190,7 +201,7 @@ Total infrastructure risk is bounded by the prepaid credit balance.
 
 | Risk | Mitigation |
 |---|---|
-| Fitment free-text is inconsistent/dirty across the 76 products | Phase 1 normalization + parse-failure review list + human audit checkpoint before Phase 2. This is the highest-effort, highest-value item in the project. |
+| Fitment free-text is inconsistent/dirty across the 76 products | Phase 1 normalization + parse-failure review list ( **`fitment_expected` only** ) + human audit checkpoint before Phase 2. **`search_products` keyword fallback over stripped `fitment_raw`** keeps unstructured-but-real fitment parts findable until content cleanup. Merch/bundles excluded from fitment review flags. |
 | Runaway LLM bill (abuse or bug) | Prepaid credits (hard stop) + daily budget breaker + rate limits + max_tokens. A runaway bill is architecturally impossible. |
 | Endpoint abused as free ChatGPT | Rate limits, length caps, strict on-topic prompt, budget breaker; Turnstile as a ready escalation. |
 | Bot states wrong price/fitment | Grounding contract: product facts only from tool results; golden test set includes the exact AI Engine failure case; dead-end fallback instead of guessing. |

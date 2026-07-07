@@ -1,0 +1,39 @@
+{
+  "name": "dieselgeeks-chatbot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Retrieval-grounded product chat assistant for dieselgeeks.com.au",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "dump-fitment": "tsx scripts/dump-fitment.ts",
+    "clear-fitment-cache": "tsx scripts/clear-fitment-parse-cache.ts",
+    "analyze-parse-failures": "tsx scripts/analyze-parse-failures.ts",
+    "generate-fitment-review-list": "tsx scripts/generate-fitment-review-list.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iahmadmustafa/DieselGeeks-Chatbot.git"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@ai-sdk/openai": "^4.0.8",
+    "@upstash/redis": "^1.38.0",
+    "ai": "^7.0.16",
+    "next": "^15.5.20",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "@types/react": "^19.2.17",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  }
+}
