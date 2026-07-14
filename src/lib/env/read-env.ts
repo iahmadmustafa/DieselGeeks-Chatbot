@@ -130,12 +130,12 @@ export function getChatMaxMessageLength(): number {
 
 export function getChatMaxHistoryMessages(): number {
   const configured = Number(
-    readEnvLocalValue("CHAT_MAX_HISTORY_MESSAGES") ?? readEnv("CHAT_MAX_HISTORY_MESSAGES") ?? "20",
+    readEnvLocalValue("CHAT_MAX_HISTORY_MESSAGES") ?? readEnv("CHAT_MAX_HISTORY_MESSAGES") ?? "16",
   );
   if (Number.isNaN(configured) || configured < 2) {
-    return 20;
+    return 16;
   }
-  return Math.min(configured, 50);
+  return Math.min(configured, 40);
 }
 
 export function getContactUrl(): string {
@@ -150,6 +150,90 @@ export function getContactUrl(): string {
   }
 
   return "https://dieselgeeks.com.au/contact-us/";
+}
+
+function readPositiveNumber(
+  envLocalName: string,
+  envName: string,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const configured = Number(readEnvLocalValue(envLocalName) ?? readEnv(envName) ?? String(fallback));
+  if (Number.isNaN(configured)) {
+    return fallback;
+  }
+  return Math.min(Math.max(configured, min), max);
+}
+
+export function getChatRateLimitIpPerMinute(): number {
+  return readPositiveNumber(
+    "CHAT_RATE_LIMIT_IP_PER_MIN",
+    "CHAT_RATE_LIMIT_IP_PER_MIN",
+    12,
+    1,
+    60,
+  );
+}
+
+export function getChatRateLimitSessionPerDay(): number {
+  return readPositiveNumber(
+    "CHAT_RATE_LIMIT_SESSION_PER_DAY",
+    "CHAT_RATE_LIMIT_SESSION_PER_DAY",
+    60,
+    5,
+    500,
+  );
+}
+
+export function getChatDailyBudgetUsd(): number {
+  return readPositiveNumber("CHAT_DAILY_BUDGET_USD", "CHAT_DAILY_BUDGET_USD", 5, 0.5, 500);
+}
+
+export function getChatEstimatedCostPerRequestUsd(): number {
+  return readPositiveNumber(
+    "CHAT_ESTIMATED_COST_PER_REQUEST_USD",
+    "CHAT_ESTIMATED_COST_PER_REQUEST_USD",
+    0.02,
+    0.001,
+    1,
+  );
+}
+
+export interface TokenUsageLike {
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+export function estimateChatRequestCostUsd(usage?: TokenUsageLike): number {
+  const fallback = getChatEstimatedCostPerRequestUsd();
+
+  if (!usage) {
+    return fallback;
+  }
+
+  const inputTokens = usage.inputTokens ?? 0;
+  const outputTokens = usage.outputTokens ?? 0;
+
+  if (inputTokens === 0 && outputTokens === 0) {
+    return fallback;
+  }
+
+  // gpt-5-mini rough list pricing (USD per 1M tokens) — conservative estimate.
+  const inputCost = inputTokens * (0.25 / 1_000_000);
+  const outputCost = outputTokens * (2.0 / 1_000_000);
+  const estimated = inputCost + outputCost;
+
+  return Math.max(estimated, 0.001);
+}
+
+function isLocalhostOrigin(origin: string): boolean {
+  try {
+    const hostname = new URL(origin).hostname;
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
 }
 
 export function getAllowedOrigins(): string[] {
@@ -184,7 +268,7 @@ export function getAllowedOrigins(): string[] {
     return [...new Set([...origins, ...localDevOrigins])];
   }
 
-  return origins;
+  return origins.filter((origin) => !isLocalhostOrigin(origin));
 }
 
 export function getFitmentLlmReasoningEffort(): FitmentLlmReasoningEffort {

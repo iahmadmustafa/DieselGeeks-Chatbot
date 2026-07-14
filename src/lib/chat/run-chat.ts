@@ -19,6 +19,7 @@ import {
   getChatModel,
   getOpenAiApiKey,
 } from "@/lib/env/read-env";
+import { recordChatSpend } from "@/lib/chat/budget";
 import { appendConversationLog } from "@/lib/redis/conversation-log";
 import { getSnapshot } from "@/lib/redis/snapshot";
 import type {
@@ -108,6 +109,19 @@ export async function runChat(options: {
           onStepEnd: ({ text }) => {
             if (text) {
               assistantText += text;
+            }
+          },
+          onFinish: async ({ usage }) => {
+            try {
+              const budgetStatus = await recordChatSpend({
+                inputTokens: usage.inputTokens,
+                outputTokens: usage.outputTokens,
+              });
+              if (budgetStatus.spentUsd >= budgetStatus.limitUsd * 0.8) {
+                console.warn("[guardrails] daily budget nearing limit", budgetStatus);
+              }
+            } catch (error) {
+              console.error("[guardrails] failed to record chat spend", error);
             }
           },
         });
