@@ -44,6 +44,16 @@ export function createChatTools(
   const catalogScope = extractCatalogScope(snapshot.products);
 
   return {
+    list_catalog_makes: tool({
+      description:
+        "List distinct vehicle makes from parsed product fitment data in the catalog snapshot. Use when the customer asks what makes, brands, or vehicles the store covers (e.g. 'list all makes', 'what vehicles do you support'). Returns only makes from product.fitment.makes — not categories or general knowledge.",
+      inputSchema: z.object({}),
+      execute: async () => ({
+        makes: catalogScope.makes,
+        make_count: catalogScope.makes.length,
+        data_source: "product.fitment.makes from catalog snapshot",
+      }),
+    }),
     search_products: tool({
       description:
         "Search the Diesel Geeks product catalog. Use part_number for SKU/OEM lookups, structured vehicle filters for fitment queries, or keyword for broad searches. Returns real prices, stock, permalinks, fitment summaries, and out_of_catalog_scope signals when the query is outside what the store carries.",

@@ -1,4 +1,3 @@
-import { stripHtml } from "@/lib/text/strip-html";
 import type { CatalogProduct } from "@/types/catalog";
 import type {
   CatalogSearchResult,
@@ -16,33 +15,6 @@ export interface ScopeAssessment {
   in_catalog_scope: boolean;
   reason: string | null;
 }
-
-const KNOWN_MAKE_TOKENS = [
-  "toyota",
-  "isuzu",
-  "nissan",
-  "ford",
-  "holden",
-  "mazda",
-  "mitsubishi",
-  "landcruiser",
-  "hilux",
-  "prado",
-  "patrol",
-  "navara",
-  "ranger",
-  "dmax",
-  "mux",
-  "colorado",
-  "rodeo",
-  "bt50",
-  "triton",
-  "pajero",
-  "gwm",
-  "ldv",
-  "volkswagen",
-  "vw",
-];
 
 const IN_SCOPE_PART_PATTERNS = [
   /\binjectors?\b/i,
@@ -153,6 +125,30 @@ function addUnique(target: Set<string>, value: string): void {
   }
 }
 
+/**
+ * Distinct vehicle makes from parsed fitment only (`product.fitment.makes[]`).
+ * Does not infer makes from titles, categories, or free text.
+ */
+export function extractFitmentMakes(products: CatalogProduct[]): string[] {
+  const makesByKey = new Map<string, string>();
+
+  for (const product of products) {
+    for (const make of product.fitment.makes) {
+      const trimmed = make.trim();
+      if (!trimmed) {
+        continue;
+      }
+
+      const key = trimmed.toLowerCase();
+      if (!makesByKey.has(key)) {
+        makesByKey.set(key, trimmed);
+      }
+    }
+  }
+
+  return [...makesByKey.values()].sort((left, right) => left.localeCompare(right));
+}
+
 function collectPartCategories(product: CatalogProduct, categories: Set<string>): void {
   for (const category of product.categories) {
     addUnique(categories, category);
@@ -168,14 +164,10 @@ function collectPartCategories(product: CatalogProduct, categories: Set<string>)
 }
 
 export function extractCatalogScope(products: CatalogProduct[]): CatalogScope {
-  const makes = new Set<string>();
   const models = new Set<string>();
   const partCategories = new Set<string>();
 
   for (const product of products) {
-    for (const make of product.fitment.makes) {
-      addUnique(makes, make);
-    }
     for (const model of product.fitment.models) {
       addUnique(models, model);
     }
@@ -183,26 +175,16 @@ export function extractCatalogScope(products: CatalogProduct[]): CatalogScope {
       addUnique(models, model);
     }
 
-    const searchable = [product.title, stripHtml(product.short_description), stripHtml(product.fitment_raw)]
-      .join(" ")
-      .toLowerCase();
-
-    for (const make of KNOWN_MAKE_TOKENS) {
-      if (searchable.includes(make)) {
-        addUnique(makes, make);
-      }
-    }
-
     collectPartCategories(product, partCategories);
   }
 
-  const sortedMakes = [...makes].sort((left, right) => left.localeCompare(right));
+  const sortedMakes = extractFitmentMakes(products);
   const sortedModels = [...models].sort((left, right) => left.localeCompare(right));
   const sortedCategories = [...partCategories].sort((left, right) => left.localeCompare(right));
 
   const summary = [
     "Diesel Geeks specialises in diesel injector and fuel system parts for utes, 4x4s, and commercial diesels.",
-    `Catalog vehicle makes: ${sortedMakes.join(", ") || "none indexed"}.`,
+    `Vehicle makes in parsed fitment data: ${sortedMakes.join(", ") || "none indexed yet"}.`,
     `Representative part categories: ${sortedCategories.slice(0, 12).join(", ") || "injectors, fuel pumps, fuel lines, nozzles, SCV valves, kits"}.`,
     "We do NOT sell general workshop parts (brakes, clutches, suspension, filters, body panels, etc.) or parts for passenger cars outside our indexed makes.",
   ].join(" ");

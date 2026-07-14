@@ -4,6 +4,7 @@ import {
   assessQueryScope,
   enrichSearchResult,
   extractCatalogScope,
+  extractFitmentMakes,
 } from "@/lib/catalog/scope";
 import type { CatalogProduct } from "@/types/catalog";
 
@@ -73,6 +74,57 @@ describe("catalog scope", () => {
   it("extracts makes and models from the catalog", () => {
     expect(scope.makes).toEqual(expect.arrayContaining(["Isuzu", "Toyota"]));
     expect(scope.models).toEqual(expect.arrayContaining(["D-Max", "Hilux"]));
+  });
+
+  it("derives makes only from parsed fitment.makes, not titles or categories", () => {
+    const makes = extractFitmentMakes([
+      makeCatalogProduct({
+        title: "Opel Astra injector kit for Freightliner and Western Star",
+        categories: ["Detroit Diesel", "Opel", "Freightliner"],
+        short_description: "Compatible with Vauxhall and Detroit Diesel commercial trucks.",
+        fitment: {
+          makes: ["Isuzu", "Ford"],
+          models: ["D-Max"],
+          engine_codes: ["4JJ1"],
+          fuel_type: "Diesel",
+          fuel_system: "Common Rail",
+          year_ranges: {},
+          notes: null,
+        },
+      }),
+      makeCatalogProduct({
+        id: 2,
+        title: "Toyota Hilux 1KD Injector Set",
+        fitment: {
+          makes: ["Toyota"],
+          models: ["Hilux"],
+          engine_codes: ["1KD"],
+          fuel_type: "Diesel",
+          fuel_system: "Common Rail",
+          year_ranges: {},
+          notes: null,
+        },
+      }),
+    ]);
+
+    expect(makes).toEqual(["Ford", "Isuzu", "Toyota"]);
+    expect(makes).not.toContain("Opel");
+    expect(makes).not.toContain("Freightliner");
+    expect(makes).not.toContain("Western Star");
+    expect(makes).not.toContain("Detroit Diesel");
+    expect(makes).not.toContain("Vauxhall");
+  });
+
+  it("deduplicates makes case-insensitively from fitment data", () => {
+    const makes = extractFitmentMakes([
+      makeCatalogProduct({ fitment: { ...makeCatalogProduct().fitment, makes: ["Ford"] } }),
+      makeCatalogProduct({
+        id: 2,
+        fitment: { ...makeCatalogProduct().fitment, makes: ["ford"] },
+      }),
+    ]);
+
+    expect(makes).toEqual(["Ford"]);
   });
 
   it("flags Honda Civic brake pads as out of catalog scope", () => {
