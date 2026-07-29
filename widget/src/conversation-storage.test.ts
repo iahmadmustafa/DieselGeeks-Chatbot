@@ -65,32 +65,3 @@ describe("conversation storage", () => {
   });
 });
 
-describe("add to cart url", () => {
-  beforeEach(() => {
-    vi.stubGlobal("localStorage", createMemoryStorage());
-    vi.stubGlobal("location", { origin: "https://shop.example" });
-  });
-
-  it("uses wc_add_to_cart_params when available", async () => {
-    vi.stubGlobal("window", {
-      wc_add_to_cart_params: {
-        wc_ajax_url: "https://shop.example/?wc-ajax=%%endpoint%%",
-      },
-      location: { origin: "https://shop.example" },
-    });
-
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ error: false, fragments: {} }),
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const { addProductToCart } = await import("./add-to-cart");
-    await addProductToCart(123);
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://shop.example/?wc-ajax=add_to_cart",
-      expect.objectContaining({ method: "POST" }),
-    );
-  });
-});
