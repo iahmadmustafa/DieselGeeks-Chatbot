@@ -18,7 +18,8 @@ interface WooAddToCartPayload {
   cart_hash?: string;
 }
 
-function getWooCommerceAjaxUrl(endpoint: string): string {
+/** Builds a `?wc-ajax={endpoint}`-style URL, respecting this site's actual configured format. */
+export function getWooCommerceAjaxUrl(endpoint: string): string {
   const params = window.wc_add_to_cart_params;
   if (params?.wc_ajax_url) {
     return params.wc_ajax_url.toString().replace("%%endpoint%%", endpoint);

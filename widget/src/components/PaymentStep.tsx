@@ -1,35 +1,17 @@
 import * as React from "react";
 
 import {
-  confirmCheckoutOrder,
+  extractStripeConfirmPiRedirect,
   formatStoreApiMoney,
-  readPaymentDetail,
   submitCheckout,
+  verifyStripeIntent,
   type StoreApiAddress,
   type StoreApiCart,
-  type StoreApiOrder,
   type StoreApiPaymentDataEntry,
 } from "../store-api";
 import { useStripeCardElement } from "../stripe-client";
 
 const LOG_PREFIX = "[dieselgeeks-chat:payment]";
-
-// WooCommerce Stripe Gateway's exact `payment_details` key for the
-// PaymentIntent client secret needed to confirm a 3D Secure challenge isn't
-// documented anywhere reliable (see investigation notes) — try the
-// candidates real-world integrations use, in order, rather than betting on
-// one guess.
-const CLIENT_SECRET_KEYS = ["client_secret", "intent_secret", "payment_intent_client_secret"];
-
-function extractClientSecret(order: StoreApiOrder): string | null {
-  for (const key of CLIENT_SECRET_KEYS) {
-    const value = readPaymentDetail(order.payment_result.payment_details, key);
-    if (value) {
-      return value;
-    }
-  }
-  return null;
-}
 
 /** Splits a single "full name" input into WooCommerce's first/last name fields. */
 function splitName(fullName: string): { first_name: string; last_name: string } {
@@ -73,33 +55,6 @@ function buildStripePaymentData(paymentMethodId: string, billingAddress: StoreAp
   ];
 }
 
-/**
- * Builds the (deliberately lighter) `payment_data` for the *second* request
- * — confirming an order after a 3D Secure challenge has already succeeded
- * client-side via `stripe.confirmCardPayment`.
- *
- * A live test surfaced a real bug from reusing `buildStripePaymentData` here:
- * `wc-stripe-new-payment-method` / `wc-stripe-is-deferred-intent` tell the
- * gateway to create a *brand-new* PaymentIntent from the given `pm_...` ID.
- * On this second call that's wrong — the order already has an intent that
- * was just 3DS-authenticated. Re-sending those flags caused the gateway to
- * spin up a second, separate intent (which happened to succeed on its own),
- * while the order's actual tracked intent was left unconfirmed — the order
- * itself got stuck on "Pending payment" instead of "Processing" even though
- * the widget correctly reported a successful `payment_status`. Omitting the
- * "treat as new" flags here lets the gateway look up and finalize the
- * existing, already-authenticated intent on the order instead.
- */
-function buildStripeConfirmPaymentData(paymentMethodId: string, billingAddress: StoreApiAddress): StoreApiPaymentDataEntry[] {
-  return [
-    { key: "wc-stripe-payment-method", value: paymentMethodId },
-    { key: "billing_email", value: billingAddress.email ?? "" },
-    { key: "billing_first_name", value: billingAddress.first_name },
-    { key: "billing_last_name", value: billingAddress.last_name },
-    { key: "payment_method", value: "stripe" },
-    { key: "paymentRequestType", value: "cc" },
-  ];
-}
 
 type PaymentStatus = "idle" | "submitting" | "confirming" | "error";
 
@@ -216,61 +171,53 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
 
     const { order } = checkoutResult;
 
-    if (order.payment_result.payment_status === "success") {
-      onOrderComplete(order);
-      return;
-    }
+    // The gateway's Store API integration always reports `payment_status:
+    // "success"` from this first call, *even when the card still needs 3D
+    // Secure confirmation* — confirmed directly against a live test (order
+    // stuck on "Pending payment", zero Stripe API activity logged, despite
+    // `payment_status` saying "success"). The real, authoritative signal
+    // that more work is needed is this specific `redirect` payment_detail,
+    // so it must be checked before trusting `payment_status` at all.
+    const confirmPi = extractStripeConfirmPiRedirect(order.payment_result);
 
-    if (order.payment_result.payment_status === "requires_action") {
-      const clientSecret = extractClientSecret(order);
-      if (!clientSecret) {
-        console.error(`${LOG_PREFIX} requires_action but no client secret found`, order.payment_result);
-        setStatus("error");
-        setErrorMessage(
-          "Your bank requires extra verification for this card, which we couldn't complete here. Please use Review & checkout below instead.",
-        );
-        return;
-      }
-
+    if (confirmPi) {
       setStatus("confirming");
-      const confirmResult = await stripeCard.confirmCardPayment(clientSecret);
+      const confirmResult = await stripeCard.confirmCardPayment(confirmPi.clientSecret);
       if (!confirmResult.ok) {
         setStatus("error");
         setErrorMessage(confirmResult.error);
         return;
       }
 
-      const finalizeResult = await confirmCheckoutOrder({
-        order_id: order.order_id,
-        order_key: order.order_key,
-        billing_address: billingAddress,
-        shipping_address: shippingAddress,
-        payment_method: "stripe",
-        payment_data: buildStripeConfirmPaymentData(paymentMethodResult.paymentMethodId, billingAddress),
+      // Finalizes the order server-side via the gateway's own
+      // `wc_stripe_verify_intent` AJAX action (the same one its classic
+      // checkout JS calls after detecting this hash) — not a second Store
+      // API request, which never actually re-checks the intent with Stripe.
+      const verifyResult = await verifyStripeIntent({
+        orderId: confirmPi.orderId,
+        intentId: confirmPi.intentId,
+        nonce: confirmPi.nonce,
       });
 
-      if (!finalizeResult.ok) {
+      if (!verifyResult.ok) {
+        console.error(`${LOG_PREFIX} verify_intent failed after successful client-side confirmation`, verifyResult.error);
         setStatus("error");
-        setErrorMessage(finalizeResult.error);
+        setErrorMessage(
+          "Your card was verified, but we couldn't finalize the order. Please try again or use Review & checkout below.",
+        );
         return;
       }
 
-      // A 200 response here only means the confirm *request* succeeded, not
-      // that the payment did — a prior version of this code called
-      // `onOrderComplete` unconditionally at this point, which told a
-      // shopper their order was confirmed for an order WooCommerce had
-      // actually recorded as "Failed". Only ever report success once the
-      // gateway itself reports the payment as successful.
-      if (finalizeResult.order.payment_result.payment_status === "success") {
-        onOrderComplete(finalizeResult.order);
-        return;
-      }
+      // `stripe.confirmCardPayment` only resolves without an error once the
+      // PaymentIntent reaches a real terminal (non-error) state — that's the
+      // authoritative signal money actually moved, unlike this gateway's
+      // Store API `payment_status` field.
+      onOrderComplete(order);
+      return;
+    }
 
-      console.error(`${LOG_PREFIX} 3DS confirmation did not result in success`, finalizeResult.order.payment_result);
-      setStatus("error");
-      setErrorMessage(
-        "Your bank's verification completed, but we couldn't confirm the payment. Please try again or use Review & checkout below.",
-      );
+    if (order.payment_result.payment_status === "success") {
+      onOrderComplete(order);
       return;
     }
 

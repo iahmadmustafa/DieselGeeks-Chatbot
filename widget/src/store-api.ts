@@ -14,6 +14,8 @@
  * Next.js `apiBase`), so all calls are relative to `window.location.origin`.
  */
 
+import { getWooCommerceAjaxUrl } from "./add-to-cart";
+
 const LOG_PREFIX = "[dieselgeeks-chat:store-api]";
 
 export interface StoreApiCurrency {
@@ -182,6 +184,82 @@ export type StoreApiCheckoutResult =
 export function readPaymentDetail(details: StoreApiPaymentDetailEntry[] | undefined, key: string): string | null {
   const entry = details?.find((item) => item.key === key);
   return entry ? entry.value : null;
+}
+
+export interface StripeConfirmPiRedirect {
+  orderId: number;
+  clientSecret: string;
+  intentId: string;
+  nonce: string;
+}
+
+// The WooCommerce Stripe Gateway's Store API integration (`add_stripe_intents`
+// in class-wc-stripe-blocks-support.php) always reports `payment_status:
+// "success"` from `/checkout`, *regardless* of whether the payment actually
+// needs further action — a live test confirmed this directly (order stayed
+// on "Pending payment" in wp-admin, and zero Stripe API calls were logged,
+// even though the widget's own `payment_status` field said "success"). The
+// real signal that a card still needs 3D Secure confirmation is this
+// `redirect` payment_detail, formatted `#wc-stripe-confirm-pi:{order_id}:
+// {client_secret}:{nonce}`. Must be checked *before* trusting `payment_status`.
+const CONFIRM_PI_REDIRECT_PATTERN = /^#wc-stripe-confirm-pi:(\d+):([^:]+):([a-zA-Z0-9]+)$/;
+
+export function extractStripeConfirmPiRedirect(
+  paymentResult: StoreApiPaymentResult,
+): StripeConfirmPiRedirect | null {
+  const redirect = readPaymentDetail(paymentResult.payment_details, "redirect");
+  if (!redirect) {
+    return null;
+  }
+
+  const match = CONFIRM_PI_REDIRECT_PATTERN.exec(redirect);
+  if (!match) {
+    return null;
+  }
+
+  const [, orderIdRaw, clientSecret, nonce] = match;
+  // A PaymentIntent client secret is always `{intent_id}_secret_{secret}`.
+  const intentId = clientSecret.split("_secret_")[0];
+  if (!intentId) {
+    return null;
+  }
+
+  return { orderId: Number(orderIdRaw), clientSecret, intentId, nonce };
+}
+
+/**
+ * Finalizes an order after `stripe.confirmCardPayment` has resolved
+ * client-side, by calling the gateway's own `wc_stripe_verify_intent` AJAX
+ * action — the same one the plugin's classic checkout JS hits when it
+ * detects a `#wc-stripe-confirm-pi:...` hash. This isn't part of the Store
+ * API; it's a WordPress AJAX endpoint, reached via the same `?wc-ajax=`
+ * URL scheme WooCommerce's own add-to-cart uses (see `getWooCommerceAjaxUrl`
+ * in `add-to-cart.ts`, reused here for consistency).
+ */
+export async function verifyStripeIntent(params: {
+  orderId: number;
+  intentId: string;
+  nonce: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const base = getWooCommerceAjaxUrl("wc_stripe_verify_intent");
+  const separator = base.includes("?") ? "&" : "?";
+  const url =
+    `${base}${separator}order=${encodeURIComponent(String(params.orderId))}` +
+    `&nonce=${encodeURIComponent(params.nonce)}` +
+    `&intent_id=${encodeURIComponent(params.intentId)}` +
+    `&is_ajax=1&_dgts=${Date.now()}`;
+
+  try {
+    const response = await fetch(url, { method: "GET", credentials: "same-origin", cache: "no-store" });
+    if (!response.ok) {
+      console.warn(`${LOG_PREFIX} verify_intent request failed`, response.status);
+      return { ok: false, error: `Request failed (${response.status}).` };
+    }
+    return { ok: true };
+  } catch (networkError) {
+    console.error(`${LOG_PREFIX} verify_intent network error`, networkError);
+    return { ok: false, error: "Could not connect. Check your connection and try again." };
+  }
 }
 
 function getStoreApiUrl(path: string): string {
