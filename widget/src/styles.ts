@@ -373,6 +373,239 @@ export const WIDGET_CSS = `
   transform: scale(0.92);
 }
 
+.dg-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.dg-cart-btn {
+  position: relative;
+}
+
+.dg-cart-btn[aria-pressed="true"] {
+  color: var(--dg-accent);
+  border-color: var(--dg-accent);
+  background: var(--dg-accent-soft);
+}
+
+.dg-cart-badge {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.3rem;
+  border-radius: var(--dg-radius-full);
+  background: var(--dg-accent);
+  color: #06282a;
+  font-size: 0.64rem;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--dg-bg-soft);
+}
+
+/* ---------- Cart review ---------- */
+
+.dg-cart-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(101, 210, 213, 0.09), transparent 45%),
+    var(--dg-bg);
+}
+
+.dg-cart-view-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--dg-border);
+  flex-shrink: 0;
+}
+
+.dg-cart-back {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--dg-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.83rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.4rem 0.25rem;
+  transition: color var(--dg-dur-fast) ease;
+}
+
+.dg-cart-back:hover {
+  color: var(--dg-accent);
+}
+
+.dg-cart-view-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.dg-cart-status {
+  margin: auto 0;
+  text-align: center;
+  color: var(--dg-muted);
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.dg-cart-status p {
+  margin: 0;
+}
+
+.dg-cart-status-hint {
+  font-size: 0.78rem;
+}
+
+.dg-cart-status-error {
+  color: #fca5a5;
+}
+
+.dg-cart-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.dg-cart-item {
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem;
+  border-radius: var(--dg-radius-md);
+  background: var(--dg-surface-2);
+  border: 1px solid var(--dg-border);
+}
+
+.dg-cart-item-image {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--dg-radius-sm);
+  overflow: hidden;
+  background: #0c0e11;
+  border: 1px solid var(--dg-border);
+  flex-shrink: 0;
+}
+
+.dg-cart-item-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.dg-cart-item-image-fallback {
+  width: 100%;
+  height: 100%;
+}
+
+.dg-cart-item-body {
+  min-width: 0;
+}
+
+.dg-cart-item-name {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--dg-text);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.dg-cart-item-meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.72rem;
+  color: var(--dg-muted);
+}
+
+.dg-cart-item-total {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--dg-accent-light);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dg-cart-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: var(--dg-radius-md);
+  background: var(--dg-surface-2);
+  border: 1px solid var(--dg-border);
+}
+
+.dg-cart-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--dg-text-secondary);
+}
+
+.dg-cart-summary-row span:last-child {
+  font-variant-numeric: tabular-nums;
+}
+
+.dg-cart-summary-total {
+  padding-top: 0.5rem;
+  margin-top: 0.15rem;
+  border-top: 1px solid var(--dg-border);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--dg-text);
+}
+
+.dg-cart-view-footer {
+  flex-shrink: 0;
+  padding: 0.85rem;
+  border-top: 1px solid var(--dg-border);
+  background: var(--dg-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.dg-cart-checkout-link {
+  width: 100%;
+}
+
+.dg-cart-view-note {
+  margin: 0;
+  font-size: 0.68rem;
+  color: var(--dg-muted);
+  line-height: 1.4;
+  text-align: center;
+}
+
 /* ---------- Messages ---------- */
 
 .dg-messages {
