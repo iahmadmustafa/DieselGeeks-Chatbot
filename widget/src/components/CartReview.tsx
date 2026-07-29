@@ -1,7 +1,10 @@
-import { formatStoreApiMoney, type StoreApiAddress, type StoreApiCart } from "../store-api";
+import * as React from "react";
+
+import { formatStoreApiMoney, type StoreApiAddress, type StoreApiCart, type StoreApiOrder } from "../store-api";
 import type { StoreCartMutationResult, StoreCartStatus } from "../use-store-cart";
 import { CartShippingSection } from "./CartShippingSection";
-import { CartIcon } from "./Icons";
+import { CartIcon, CheckIcon } from "./Icons";
+import { PaymentStep } from "./PaymentStep";
 
 interface CartReviewProps {
   cart: StoreApiCart | null;
@@ -31,6 +34,40 @@ export function CartReview({
   const cartUrl = `${window.location.origin}/cart/`;
   const isEmpty = status === "ready" && (!cart || cart.items.length === 0);
   const isPopulated = status === "ready" && !!cart && cart.items.length > 0;
+  const [completedOrder, setCompletedOrder] = React.useState<StoreApiOrder | null>(null);
+
+  const readyForPayment =
+    !!cart && cart.needs_payment && (!cart.needs_shipping || cart.has_calculated_shipping);
+
+  function handleOrderComplete(order: StoreApiOrder): void {
+    setCompletedOrder(order);
+  }
+
+  function handleDone(): void {
+    setCompletedOrder(null);
+    onRefresh();
+    onBack();
+  }
+
+  if (completedOrder) {
+    return (
+      <div className="dg-cart-view">
+        <div className="dg-cart-view-body dg-order-confirmation">
+          <span className="dg-order-confirmation-icon" aria-hidden="true">
+            <CheckIcon size={28} />
+          </span>
+          <h4>Order confirmed</h4>
+          <p>
+            Order #{completedOrder.order_id} is on its way. We've sent a receipt to your email — thanks for
+            shopping with Diesel Geeks!
+          </p>
+          <button type="button" className="dg-btn dg-btn-primary" onClick={handleDone}>
+            Back to chat
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dg-cart-view">
@@ -157,17 +194,19 @@ export function CartReview({
                 <span>{formatStoreApiMoney(cart.totals.total_price, cart.totals)}</span>
               </div>
             </div>
+
+            {readyForPayment ? <PaymentStep cart={cart} onOrderComplete={handleOrderComplete} /> : null}
           </>
         ) : null}
       </div>
 
       <div className="dg-cart-view-footer">
-        <a className="dg-btn dg-btn-primary dg-cart-checkout-link" href={cartUrl}>
+        <a className="dg-btn dg-btn-secondary dg-cart-checkout-link" href={cartUrl}>
           <CartIcon className="dg-btn-icon" size={14} />
-          Review &amp; checkout
+          Open full cart page instead
         </a>
         <p className="dg-cart-view-note">
-          In-chat checkout is coming soon. For now this opens your full cart to complete the order securely.
+          Prefer the full site? This opens your cart on dieselgeeks.com.au to complete the order there instead.
         </p>
       </div>
     </div>

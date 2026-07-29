@@ -47,3 +47,29 @@ export function resolveMobileBottomOffsetPx(): number {
 
   return DEFAULT_MOBILE_BOTTOM_OFFSET_PX;
 }
+
+/**
+ * Stripe publishable keys are safe to expose client-side, but this widget
+ * bundle is shared across environments (e.g. a live production key vs a
+ * test-mode key on staging), so it can't be hardcoded at build time. Each
+ * site configures its own via `window.DIESELGEEKS_CHAT_STRIPE_PUBLISHABLE_KEY`
+ * or a `data-stripe-publishable-key` attribute on the loader script tag —
+ * the same pattern as the other per-site config in this file. Returns null
+ * (rather than a fallback) when unset, since there's no safe default and the
+ * payment step should degrade gracefully instead of using the wrong key.
+ */
+export function resolveStripePublishableKey(): string | null {
+  const globalConfig = (window as Window & { DIESELGEEKS_CHAT_STRIPE_PUBLISHABLE_KEY?: string })
+    .DIESELGEEKS_CHAT_STRIPE_PUBLISHABLE_KEY;
+  if (globalConfig?.trim()) {
+    return globalConfig.trim();
+  }
+
+  const configured = document.querySelector<HTMLScriptElement>('script[src*="dieselgeeks-chat"]');
+  const fromDataset = configured?.dataset.stripePublishableKey?.trim();
+  if (fromDataset) {
+    return fromDataset;
+  }
+
+  return null;
+}

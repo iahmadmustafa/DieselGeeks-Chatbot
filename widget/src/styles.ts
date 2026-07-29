@@ -738,6 +738,108 @@ export const WIDGET_CSS = `
   gap: 0.5rem;
 }
 
+.dg-payment-step {
+  padding: 0.9rem;
+  border-radius: var(--dg-radius-lg);
+  background: var(--dg-surface-2);
+  border: 1px solid var(--dg-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.dg-payment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.dg-payment-form input[type="email"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--dg-radius-sm);
+  border: 1px solid var(--dg-border);
+  background: var(--dg-surface);
+  color: var(--dg-text);
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.dg-payment-form input[type="email"]:focus {
+  outline: none;
+  border-color: var(--dg-accent);
+}
+
+.dg-payment-card-field {
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--dg-radius-sm);
+  border: 1px solid var(--dg-border);
+  background: var(--dg-surface);
+}
+
+.dg-payment-card-iframe {
+  width: 100%;
+  height: 22px;
+  border: none;
+  display: block;
+}
+
+.dg-payment-submit {
+  width: 100%;
+  justify-content: center;
+}
+
+.dg-payment-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.dg-payment-secure-note {
+  margin: 0;
+  font-size: 0.68rem;
+  color: var(--dg-text-secondary);
+  opacity: 0.8;
+  text-align: center;
+}
+
+.dg-order-confirmation {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.6rem;
+  padding: 2rem 1.25rem;
+}
+
+.dg-order-confirmation-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dg-success-soft);
+  color: var(--dg-success);
+}
+
+.dg-order-confirmation h4 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--dg-text);
+}
+
+.dg-order-confirmation p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--dg-text-secondary);
+  max-width: 26rem;
+}
+
 .dg-cart-checkout-link {
   width: 100%;
 }

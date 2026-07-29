@@ -135,6 +135,43 @@ export interface StoreApiCart {
 
 export type StoreApiCartResult = { ok: true; cart: StoreApiCart } | { ok: false; error: string };
 
+export interface StoreApiPaymentDataEntry {
+  key: string;
+  value: string;
+}
+
+/**
+ * WooCommerce's own docs describe this shape only loosely ("a PaymentResult
+ * object... status, redirect url, and any additional payment details") since
+ * every gateway can add its own keys to `payment_details`. We only rely on
+ * `payment_status` for branching logic; anything gateway-specific (e.g. a
+ * Stripe `client_secret` for a 3D Secure challenge) is read defensively out
+ * of `payment_details` by key, logging the raw shape so real responses can
+ * be inspected if a key name assumption turns out wrong.
+ */
+export interface StoreApiPaymentResult {
+  payment_status: string;
+  payment_details: StoreApiPaymentDataEntry[];
+  redirect_url?: string;
+}
+
+export interface StoreApiOrder {
+  order_id: number;
+  order_key: string;
+  status: string;
+  payment_result: StoreApiPaymentResult;
+}
+
+export type StoreApiCheckoutResult =
+  | { ok: true; order: StoreApiOrder }
+  | { ok: false; error: string };
+
+/** Reads a single value out of a Store API `payment_details`-shaped array. */
+export function readPaymentDetail(details: StoreApiPaymentDataEntry[] | undefined, key: string): string | null {
+  const entry = details?.find((item) => item.key === key);
+  return entry ? entry.value : null;
+}
+
 function getStoreApiUrl(path: string): string {
   // A cache-busting query param defeats CDN/edge/object-cache layers that key
   // purely on URL and ignore the fetch-level `cache: "no-store"` hint below
@@ -276,6 +313,67 @@ export async function selectShippingRate(
     body: JSON.stringify({ package_id: packageId, rate_id: rateId }),
   });
   return toCartResult(result);
+}
+
+function toCheckoutResult(result: StoreApiRequestResult<StoreApiOrder>): StoreApiCheckoutResult {
+  if (!result.ok) {
+    return result;
+  }
+
+  if (!result.data || typeof result.data.order_id !== "number") {
+    console.warn(`${LOG_PREFIX} unexpected checkout response shape`, result.data);
+    return { ok: false, error: "Could not process your order. Please try again." };
+  }
+
+  // eslint-disable-next-line no-console -- intentional debugging aid while validating the real payment_result shape this site's Stripe gateway version returns
+  console.log(`${LOG_PREFIX} checkout response`, result.data);
+
+  return { ok: true, order: result.data };
+}
+
+/**
+ * Submits the cart for checkout. `payment_data` is gateway-specific — for
+ * WooCommerce Stripe Gateway (classic PaymentMethod flow, still supported
+ * alongside its newer Confirmation Token flow) this is a Stripe
+ * `pm_...` PaymentMethod ID created client-side via Stripe.js, passed as
+ * `wc-stripe-payment-method`.
+ */
+export async function submitCheckout(params: {
+  billing_address: StoreApiAddress;
+  shipping_address?: StoreApiAddress;
+  payment_method: string;
+  payment_data: StoreApiPaymentDataEntry[];
+}): Promise<StoreApiCheckoutResult> {
+  const result = await storeApiRequest<StoreApiOrder>("/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  return toCheckoutResult(result);
+}
+
+/**
+ * Confirms an order after the client has resolved a required action (e.g. a
+ * completed 3D Secure challenge via `stripe.confirmCardPayment`). Per
+ * WooCommerce's Store API docs, this is the same `/checkout/{order_id}`
+ * resource, re-submitted with the order's key for verification.
+ */
+export async function confirmCheckoutOrder(params: {
+  order_id: number;
+  order_key: string;
+  billing_email?: string;
+  billing_address: StoreApiAddress;
+  shipping_address?: StoreApiAddress;
+  payment_method: string;
+  payment_data: StoreApiPaymentDataEntry[];
+}): Promise<StoreApiCheckoutResult> {
+  const { order_id, ...body } = params;
+  const result = await storeApiRequest<StoreApiOrder>(`/checkout/${order_id}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return toCheckoutResult(result);
 }
 
 /**

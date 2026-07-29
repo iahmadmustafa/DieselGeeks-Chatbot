@@ -212,6 +212,148 @@ describe("updateCustomerAddress and selectShippingRate", () => {
   });
 });
 
+describe("submitCheckout and confirmCheckoutOrder", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  const billingAddress = {
+    first_name: "Jane",
+    last_name: "Doe",
+    company: "",
+    address_1: "1 Test St",
+    address_2: "",
+    city: "Sydney",
+    state: "NSW",
+    postcode: "2000",
+    country: "AU",
+    email: "jane@example.com",
+  };
+
+  it("posts to /checkout and returns the order on a successful payment", async () => {
+    stubWindow();
+    const fetchMock = stubFetchJson({
+      body: {
+        order_id: 123,
+        order_key: "wc_order_abc",
+        status: "processing",
+        payment_result: { payment_status: "success", payment_details: [] },
+      },
+    });
+
+    const { submitCheckout } = await import("./store-api");
+    const result = await submitCheckout({
+      billing_address: billingAddress,
+      payment_method: "stripe",
+      payment_data: [{ key: "wc-stripe-payment-method", value: "pm_123" }],
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.order.order_id).toBe(123);
+      expect(result.order.payment_result.payment_status).toBe("success");
+    }
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/checkout");
+    expect(JSON.parse(init.body as string)).toEqual(
+      expect.objectContaining({ payment_method: "stripe" }),
+    );
+  });
+
+  it("surfaces a requires_action payment status without treating it as a failure", async () => {
+    stubWindow();
+    stubFetchJson({
+      body: {
+        order_id: 124,
+        order_key: "wc_order_def",
+        status: "pending",
+        payment_result: {
+          payment_status: "requires_action",
+          payment_details: [{ key: "client_secret", value: "pi_123_secret_456" }],
+        },
+      },
+    });
+
+    const { submitCheckout, readPaymentDetail } = await import("./store-api");
+    const result = await submitCheckout({
+      billing_address: billingAddress,
+      payment_method: "stripe",
+      payment_data: [{ key: "wc-stripe-payment-method", value: "pm_123" }],
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.order.payment_result.payment_status).toBe("requires_action");
+      expect(readPaymentDetail(result.order.payment_result.payment_details, "client_secret")).toBe(
+        "pi_123_secret_456",
+      );
+    }
+  });
+
+  it("surfaces the server error message on a failed checkout", async () => {
+    stubWindow();
+    stubFetchJson({ ok: false, status: 400, body: { message: "Your card was declined." } });
+
+    const { submitCheckout } = await import("./store-api");
+    const result = await submitCheckout({
+      billing_address: billingAddress,
+      payment_method: "stripe",
+      payment_data: [{ key: "wc-stripe-payment-method", value: "pm_123" }],
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("Your card was declined.");
+    }
+  });
+
+  it("never rejects on a network error during checkout", async () => {
+    stubWindow();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    const { submitCheckout } = await import("./store-api");
+
+    await expect(
+      submitCheckout({
+        billing_address: billingAddress,
+        payment_method: "stripe",
+        payment_data: [],
+      }),
+    ).resolves.toEqual(expect.objectContaining({ ok: false }));
+  });
+
+  it("posts to /checkout/{order_id} to confirm a 3DS-resolved order", async () => {
+    stubWindow();
+    const fetchMock = stubFetchJson({
+      body: {
+        order_id: 124,
+        order_key: "wc_order_def",
+        status: "processing",
+        payment_result: { payment_status: "success", payment_details: [] },
+      },
+    });
+
+    const { confirmCheckoutOrder } = await import("./store-api");
+    const result = await confirmCheckoutOrder({
+      order_id: 124,
+      order_key: "wc_order_def",
+      billing_address: billingAddress,
+      payment_method: "stripe",
+      payment_data: [{ key: "wc-stripe-payment-method", value: "pm_123" }],
+    });
+
+    expect(result.ok).toBe(true);
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/checkout/124");
+  });
+});
+
 describe("formatStoreApiMoney", () => {
   it("formats minor units using the currency metadata", async () => {
     const { formatStoreApiMoney } = await import("./store-api");
