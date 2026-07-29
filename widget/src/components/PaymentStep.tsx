@@ -73,6 +73,34 @@ function buildStripePaymentData(paymentMethodId: string, billingAddress: StoreAp
   ];
 }
 
+/**
+ * Builds the (deliberately lighter) `payment_data` for the *second* request
+ * — confirming an order after a 3D Secure challenge has already succeeded
+ * client-side via `stripe.confirmCardPayment`.
+ *
+ * A live test surfaced a real bug from reusing `buildStripePaymentData` here:
+ * `wc-stripe-new-payment-method` / `wc-stripe-is-deferred-intent` tell the
+ * gateway to create a *brand-new* PaymentIntent from the given `pm_...` ID.
+ * On this second call that's wrong — the order already has an intent that
+ * was just 3DS-authenticated. Re-sending those flags caused the gateway to
+ * spin up a second, separate intent (which happened to succeed on its own),
+ * while the order's actual tracked intent was left unconfirmed — the order
+ * itself got stuck on "Pending payment" instead of "Processing" even though
+ * the widget correctly reported a successful `payment_status`. Omitting the
+ * "treat as new" flags here lets the gateway look up and finalize the
+ * existing, already-authenticated intent on the order instead.
+ */
+function buildStripeConfirmPaymentData(paymentMethodId: string, billingAddress: StoreApiAddress): StoreApiPaymentDataEntry[] {
+  return [
+    { key: "wc-stripe-payment-method", value: paymentMethodId },
+    { key: "billing_email", value: billingAddress.email ?? "" },
+    { key: "billing_first_name", value: billingAddress.first_name },
+    { key: "billing_last_name", value: billingAddress.last_name },
+    { key: "payment_method", value: "stripe" },
+    { key: "paymentRequestType", value: "cc" },
+  ];
+}
+
 type PaymentStatus = "idle" | "submitting" | "confirming" | "error";
 
 interface PaymentStepProps {
@@ -218,7 +246,7 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
         billing_address: billingAddress,
         shipping_address: shippingAddress,
         payment_method: "stripe",
-        payment_data: buildStripePaymentData(paymentMethodResult.paymentMethodId, billingAddress),
+        payment_data: buildStripeConfirmPaymentData(paymentMethodResult.paymentMethodId, billingAddress),
       });
 
       if (!finalizeResult.ok) {
@@ -227,7 +255,22 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
         return;
       }
 
-      onOrderComplete(finalizeResult.order);
+      // A 200 response here only means the confirm *request* succeeded, not
+      // that the payment did — a prior version of this code called
+      // `onOrderComplete` unconditionally at this point, which told a
+      // shopper their order was confirmed for an order WooCommerce had
+      // actually recorded as "Failed". Only ever report success once the
+      // gateway itself reports the payment as successful.
+      if (finalizeResult.order.payment_result.payment_status === "success") {
+        onOrderComplete(finalizeResult.order);
+        return;
+      }
+
+      console.error(`${LOG_PREFIX} 3DS confirmation did not result in success`, finalizeResult.order.payment_result);
+      setStatus("error");
+      setErrorMessage(
+        "Your bank's verification completed, but we couldn't confirm the payment. Please try again or use Review & checkout below.",
+      );
       return;
     }
 
