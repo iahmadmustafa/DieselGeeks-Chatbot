@@ -780,9 +780,10 @@ export const WIDGET_CSS = `
 
 .dg-payment-card-iframe {
   width: 100%;
-  height: 22px;
+  height: 24px;
   border: none;
   display: block;
+  color-scheme: dark;
 }
 
 .dg-payment-submit {

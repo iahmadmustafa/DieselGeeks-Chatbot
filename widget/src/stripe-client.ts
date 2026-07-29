@@ -22,7 +22,7 @@ function prepareIframeDocument(iframe: HTMLIFrameElement): HTMLElement | null {
   }
 
   const style = doc.createElement("style");
-  style.textContent = "html, body { margin: 0; padding: 0; background: transparent; }";
+  style.textContent = "html, body { margin: 0; padding: 0; background: transparent; height: 100%; }";
   doc.head.appendChild(style);
 
   const mount = doc.createElement("div");
@@ -103,14 +103,19 @@ export function useStripeCardElement(): StripeCardElementState {
 
         const elements = stripe.elements();
         const card = elements.create("card", {
+          // The widget is dark-themed (see design tokens in styles.ts) —
+          // Stripe's Card Element defaults to black text, which is invisible
+          // against our dark surface unless explicitly overridden here.
           style: {
             base: {
               fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
               fontSize: "15px",
-              color: "#1a1f26",
-              "::placeholder": { color: "#9aa3ad" },
+              color: "#f6f7f9",
+              iconColor: "#8b93a1",
+              backgroundColor: "transparent",
+              "::placeholder": { color: "#8b93a1" },
             },
-            invalid: { color: "#d33f3f" },
+            invalid: { color: "#f87171", iconColor: "#f87171" },
           },
         });
 
@@ -120,18 +125,33 @@ export function useStripeCardElement(): StripeCardElementState {
         card.mount(mount);
         cardRef.current = card;
 
-        card.on("ready", () => {
+        function markReady(): void {
           if (!cancelled) {
-            setStatus("ready");
+            setStatus((current) => (current === "loading" ? "ready" : current));
           }
-        });
+        }
+
+        card.on("ready", markReady);
         card.on("change", (event) => {
           if (cancelled) {
             return;
           }
+          // Belt-and-braces: a `change` event firing at all is itself proof
+          // the element is mounted and interactive, so treat it as "ready"
+          // too. Real-world testing found `ready` didn't reliably fire once
+          // the Card Element ended up nested inside our dynamically-created
+          // iframe (as opposed to a normal document) — without this, the
+          // form stayed stuck showing "Loading payment form…" and the Pay
+          // button stayed disabled even though the card was fully typed in.
+          markReady();
           setCardComplete(event.complete);
           setErrorMessage(event.error?.message ?? null);
         });
+
+        // Final safety net: if neither event above has fired within a few
+        // seconds, but mounting didn't throw, assume it's actually usable
+        // rather than leaving the form stuck forever.
+        window.setTimeout(markReady, 2500);
       } catch (error) {
         if (!cancelled) {
           setStatus("error");
