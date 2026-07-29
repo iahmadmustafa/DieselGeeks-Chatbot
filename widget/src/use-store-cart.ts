@@ -2,6 +2,7 @@ import * as React from "react";
 
 import { CART_ADDED_EVENT } from "./add-to-cart";
 import {
+  clearCachedCartToken,
   getCart,
   selectShippingRate as selectShippingRateApi,
   updateCustomerAddress as updateCustomerAddressApi,
@@ -74,6 +75,10 @@ export function useStoreCart(enabled: boolean): StoreCartState {
 
   React.useEffect(() => {
     function handleCartAdded() {
+      // See clearCachedCartToken()'s doc comment: the item was just added via
+      // the classic (cookie-based) add-to-cart endpoint, so any Cart-Token we
+      // cached before this point can be stale and must not be reused here.
+      clearCachedCartToken();
       void load();
     }
 

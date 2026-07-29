@@ -82,6 +82,38 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
     stripeCard.cardComplete &&
     status === "idle";
 
+  // Three prior rounds of fixes (hidden postal-code field, missing name
+  // field, Stripe Element styling) each addressed a plausible cause of the
+  // Pay button staying disabled, but reports of it still being unclickable
+  // kept coming back without saying which condition was actually failing.
+  // Surfacing the exact blocking reason(s) directly in the UI turns "still
+  // doesn't work" into an actionable, specific report.
+  const blockers: string[] = [];
+  if (status === "idle") {
+    if (!nameSource) blockers.push("finish the shipping address step above first");
+    if (!fullName.trim()) blockers.push("enter the name on the card");
+    if (!email.trim()) blockers.push("enter an email for your receipt");
+    if (stripeCard.status === "loading") blockers.push("payment form is still loading");
+    else if (stripeCard.status === "error" || stripeCard.status === "unavailable")
+      blockers.push("payment form failed to load");
+    else if (stripeCard.status === "ready" && !stripeCard.cardComplete)
+      blockers.push("finish entering your card number, expiry & CVC");
+  }
+
+  React.useEffect(() => {
+    // eslint-disable-next-line no-console -- intentional diagnostic aid for tracking down a persistently-disabled Pay button
+    console.debug(`${LOG_PREFIX} pay button state`, {
+      canSubmit,
+      email: email.trim().length > 0,
+      fullName: fullName.trim().length > 0,
+      hasNameSource: !!nameSource,
+      stripeStatus: stripeCard.status,
+      cardComplete: stripeCard.cardComplete,
+      stripeError: stripeCard.errorMessage,
+      status,
+    });
+  }, [canSubmit, email, fullName, nameSource, stripeCard.status, stripeCard.cardComplete, stripeCard.errorMessage, status]);
+
   async function handleSubmit(event: React.FormEvent): Promise<void> {
     event.preventDefault();
     if (!canSubmit || !nameSource) {
@@ -221,6 +253,9 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
               ? "Processing…"
               : `Pay ${formatStoreApiMoney(cart.totals.total_price, cart.totals)}`}
         </button>
+        {!canSubmit && !busy && blockers.length > 0 ? (
+          <p className="dg-cart-shipping-hint">Please {blockers.join(", ")} to continue.</p>
+        ) : null}
         <p className="dg-payment-secure-note">Payments are processed securely by Stripe. Card details never touch our servers.</p>
       </form>
     </div>

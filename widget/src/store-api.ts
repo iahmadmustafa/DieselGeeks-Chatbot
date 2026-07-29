@@ -199,6 +199,30 @@ function captureCartToken(response: Response): void {
   }
 }
 
+/**
+ * Drops the cached `Cart-Token` so the next Store API call falls back to
+ * cookie-based identification.
+ *
+ * This matters because `add-to-cart.ts` adds items through WooCommerce's
+ * classic `?wc-ajax=add_to_cart` endpoint (cookie/session based), not the
+ * Store API — so it never updates `cachedCartToken`. If a Store API call had
+ * already run *before* any add-to-cart (e.g. the cart badge loading the
+ * moment the panel opens), our cached token points at whatever anonymous
+ * cart existed at that moment. On a device with no pre-existing WooCommerce
+ * session cookie (a fresh guest — incognito, or a first-time visitor),
+ * WooCommerce prioritizes that stale `Cart-Token` header over the cookie
+ * session the add-to-cart call just created/updated, so the next `getCart()`
+ * silently returns the wrong (empty) cart even though the item really was
+ * added — confirmed against the live site by replaying this exact sequence.
+ * Clearing the token right after an add-to-cart forces that refetch to use
+ * cookies instead, which always reflects the real cart, and a fresh
+ * (correctly-scoped) token gets recaptured from that response for any
+ * mutations that follow.
+ */
+export function clearCachedCartToken(): void {
+  cachedCartToken = null;
+}
+
 interface StoreApiRequestSuccess<T> {
   ok: true;
   data: T;
