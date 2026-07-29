@@ -866,15 +866,26 @@ ${T}`,p++;break;case"id":u=T.includes("\0")?void 0:T;break;case"retry":/^\d+$/.t
 }
 
 .dg-payment-card-field {
-  padding: 0.6rem 0.7rem;
+  padding: 0.2rem 0.7rem;
   border-radius: var(--dg-radius-sm);
   border: 1px solid var(--dg-border);
   background: var(--dg-surface);
 }
 
 .dg-payment-card-iframe {
+  /*
+   * A 24px iframe is too tight for Stripe's default Card Element at 15px
+   * font \u2014 Stripe lays out card number / expiry / CVC as one row with its
+   * own internal vertical padding, and a squeezed container clips part of
+   * that row. That doesn't just look bad: it can make the expiry/CVC
+   * portion effectively unclickable, so the card can never actually
+   * satisfy Stripe's "complete" check no matter what's typed \u2014 which
+   * presents as the Pay button being permanently stuck disabled. 48px
+   * matches the height used in our own dev proof-of-concept (see
+   * stripe-poc.tsx), which was confirmed working end-to-end.
+   */
   width: 100%;
-  height: 24px;
+  height: 48px;
   border: none;
   display: block;
   color-scheme: dark;
