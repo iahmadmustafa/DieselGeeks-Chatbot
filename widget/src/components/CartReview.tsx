@@ -1,9 +1,15 @@
 import * as React from "react";
 
-import { formatStoreApiMoney, type StoreApiAddress, type StoreApiCart, type StoreApiOrder } from "../store-api";
+import {
+  clearCachedCartToken,
+  formatStoreApiMoney,
+  type StoreApiAddress,
+  type StoreApiCart,
+  type StoreApiOrder,
+} from "../store-api";
 import type { StoreCartMutationResult, StoreCartStatus } from "../use-store-cart";
 import { CartShippingSection } from "./CartShippingSection";
-import { CartIcon, CheckIcon } from "./Icons";
+import { CartIcon, CheckIcon, TrashIcon } from "./Icons";
 import { PaymentStep } from "./PaymentStep";
 
 interface CartReviewProps {
@@ -14,6 +20,7 @@ interface CartReviewProps {
   onBack: () => void;
   onUpdateAddress: (address: Partial<StoreApiAddress>) => Promise<StoreCartMutationResult>;
   onSelectRate: (packageId: number | string, rateId: string) => Promise<StoreCartMutationResult>;
+  onRemoveItem: (itemKey: string) => Promise<StoreCartMutationResult>;
 }
 
 /**
@@ -30,16 +37,38 @@ export function CartReview({
   onBack,
   onUpdateAddress,
   onSelectRate,
+  onRemoveItem,
 }: CartReviewProps) {
   const cartUrl = `${window.location.origin}/cart/`;
   const isEmpty = status === "ready" && (!cart || cart.items.length === 0);
   const isPopulated = status === "ready" && !!cart && cart.items.length > 0;
   const [completedOrder, setCompletedOrder] = React.useState<StoreApiOrder | null>(null);
+  const [removingKey, setRemovingKey] = React.useState<string | null>(null);
+  const [removeError, setRemoveError] = React.useState<string | null>(null);
+
+  async function handleRemoveItem(itemKey: string): Promise<void> {
+    setRemoveError(null);
+    setRemovingKey(itemKey);
+    const result = await onRemoveItem(itemKey);
+    setRemovingKey(null);
+    if (!result.ok) {
+      setRemoveError(result.error);
+    }
+  }
 
   const readyForPayment =
     !!cart && cart.needs_payment && (!cart.needs_shipping || cart.has_calculated_shipping);
 
   function handleOrderComplete(order: StoreApiOrder): void {
+    // A completed order converts the cart it came from and WooCommerce
+    // issues a new session/cart for whatever comes next — reusing the old
+    // `Cart-Token` after this point gets rejected server-side with "CSRF
+    // verification failed" (confirmed live: it started appearing on the very
+    // next checkout attempt in the same widget session right after a prior
+    // order succeeded). Dropping it forces the next request back onto
+    // cookie-based identification, the same fix already used for the
+    // add-to-cart/incognito cart-sync bug above.
+    clearCachedCartToken();
     setCompletedOrder(order);
   }
 
@@ -118,9 +147,11 @@ export function CartReview({
 
         {isPopulated && cart ? (
           <>
+            {removeError ? <p className="dg-cart-shipping-error">{removeError}</p> : null}
             <ul className="dg-cart-items">
               {cart.items.map((item) => {
                 const image = item.images[0];
+                const isRemoving = removingKey === item.key;
                 return (
                   <li className="dg-cart-item" key={item.key}>
                     <div className="dg-cart-item-image">
@@ -139,6 +170,16 @@ export function CartReview({
                     <div className="dg-cart-item-total">
                       {formatStoreApiMoney(item.totals.line_total, item.totals)}
                     </div>
+                    <button
+                      type="button"
+                      className="dg-cart-item-remove"
+                      onClick={() => void handleRemoveItem(item.key)}
+                      disabled={isRemoving}
+                      aria-label={`Remove ${item.name} from cart`}
+                      title="Remove from cart"
+                    >
+                      {isRemoving ? <span className="dg-spinner" aria-hidden="true" /> : <TrashIcon size={14} />}
+                    </button>
                   </li>
                 );
               })}

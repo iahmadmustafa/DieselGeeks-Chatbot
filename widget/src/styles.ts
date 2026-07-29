@@ -491,7 +491,7 @@ export const WIDGET_CSS = `
 
 .dg-cart-item {
   display: grid;
-  grid-template-columns: 52px 1fr auto;
+  grid-template-columns: 52px 1fr auto auto;
   align-items: center;
   gap: 0.7rem;
   padding: 0.6rem;
@@ -551,6 +551,34 @@ export const WIDGET_CSS = `
   color: var(--dg-accent-light);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.dg-cart-item-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--dg-radius-sm);
+  background: transparent;
+  color: var(--dg-muted);
+  cursor: pointer;
+  transition: color var(--dg-dur-fast) var(--dg-ease-out), background var(--dg-dur-fast) var(--dg-ease-out),
+    border-color var(--dg-dur-fast) var(--dg-ease-out);
+}
+
+.dg-cart-item-remove:hover:not(:disabled) {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+.dg-cart-item-remove:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 /* ---------- Cart shipping (stage 2) ---------- */

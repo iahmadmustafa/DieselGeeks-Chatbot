@@ -4,6 +4,7 @@ import { CART_ADDED_EVENT } from "./add-to-cart";
 import {
   clearCachedCartToken,
   getCart,
+  removeCartItem as removeCartItemApi,
   selectShippingRate as selectShippingRateApi,
   updateCustomerAddress as updateCustomerAddressApi,
   type StoreApiAddress,
@@ -21,6 +22,7 @@ export interface StoreCartState {
   refresh: () => void;
   updateShippingAddress: (address: Partial<StoreApiAddress>) => Promise<StoreCartMutationResult>;
   selectShippingRate: (packageId: number | string, rateId: string) => Promise<StoreCartMutationResult>;
+  removeItem: (itemKey: string) => Promise<StoreCartMutationResult>;
 }
 
 /**
@@ -112,6 +114,16 @@ export function useStoreCart(enabled: boolean): StoreCartState {
     [],
   );
 
+  const removeItem = React.useCallback(async (itemKey: string): Promise<StoreCartMutationResult> => {
+    const result = await removeCartItemApi(itemKey);
+    if (!result.ok) {
+      return { ok: false, error: result.error };
+    }
+    setCart(result.cart);
+    setStatus("ready");
+    return { ok: true };
+  }, []);
+
   return {
     status,
     cart,
@@ -119,5 +131,6 @@ export function useStoreCart(enabled: boolean): StoreCartState {
     refresh: () => void load(),
     updateShippingAddress,
     selectShippingRate,
+    removeItem,
   };
 }

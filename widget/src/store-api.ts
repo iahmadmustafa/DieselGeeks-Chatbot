@@ -416,6 +416,14 @@ export async function updateCustomerAddress(address: {
   return toCartResult(result);
 }
 
+/** Removes a single line item (by its cart item `key`) and returns the updated cart. */
+export async function removeCartItem(itemKey: string): Promise<StoreApiCartResult> {
+  const result = await storeApiRequest<StoreApiCart>(`/cart/items/${encodeURIComponent(itemKey)}`, {
+    method: "DELETE",
+  });
+  return toCartResult(result);
+}
+
 /** Selects a shipping rate for a package; returns the cart with updated totals. */
 export async function selectShippingRate(
   packageId: number | string,

@@ -86,13 +86,19 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
   const [status, setStatus] = React.useState<PaymentStatus>("idle");
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
+  // A failed attempt (declined card, network hiccup, CSRF/nonce issue, etc.)
+  // must still allow retrying without leaving this screen — confirmed as a
+  // real dead end in testing: `status` stayed "error" forever afterward,
+  // and since `canSubmit` only allowed "idle", the Pay button stayed
+  // permanently disabled with no way back short of leaving the cart view
+  // and re-entering checkout from scratch.
   const canSubmit =
     email.trim().length > 0 &&
     fullName.trim().length > 0 &&
     !!nameSource &&
     stripeCard.status === "ready" &&
     stripeCard.cardComplete &&
-    status === "idle";
+    (status === "idle" || status === "error");
 
   // Three prior rounds of fixes (hidden postal-code field, missing name
   // field, Stripe Element styling) each addressed a plausible cause of the
@@ -101,7 +107,7 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
   // Surfacing the exact blocking reason(s) directly in the UI turns "still
   // doesn't work" into an actionable, specific report.
   const blockers: string[] = [];
-  if (status === "idle") {
+  if (status === "idle" || status === "error") {
     if (!nameSource) blockers.push("finish the shipping address step above first");
     if (!fullName.trim()) blockers.push("enter the name on the card");
     if (!email.trim()) blockers.push("enter an email for your receipt");
