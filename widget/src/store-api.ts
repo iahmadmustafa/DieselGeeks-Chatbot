@@ -82,7 +82,14 @@ export interface StoreApiCart {
 export type StoreApiCartResult = { ok: true; cart: StoreApiCart } | { ok: false; error: string };
 
 function getStoreApiUrl(path: string): string {
-  return `${window.location.origin}/wp-json/wc/store/v1${path}`;
+  // A cache-busting query param defeats CDN/edge/object-cache layers that key
+  // purely on URL and ignore the fetch-level `cache: "no-store"` hint below
+  // (that hint only affects the browser's own HTTP cache, not intermediate
+  // proxies). Without this, the cart view can keep showing an earlier,
+  // smaller snapshot of the cart after items are added.
+  const cacheBuster = `_dgts=${Date.now()}`;
+  const separator = path.includes("?") ? "&" : "?";
+  return `${window.location.origin}/wp-json/wc/store/v1${path}${separator}${cacheBuster}`;
 }
 
 /**
@@ -96,6 +103,7 @@ export async function getCart(): Promise<StoreApiCartResult> {
     response = await fetch(getStoreApiUrl("/cart"), {
       method: "GET",
       credentials: "same-origin",
+      cache: "no-store",
       headers: { Accept: "application/json" },
     });
   } catch (networkError) {

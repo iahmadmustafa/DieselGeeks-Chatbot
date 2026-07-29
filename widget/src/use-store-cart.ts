@@ -22,13 +22,26 @@ export function useStoreCart(enabled: boolean): StoreCartState {
   const [cart, setCart] = React.useState<StoreApiCart | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const hasLoadedRef = React.useRef(false);
+  const requestIdRef = React.useRef(0);
 
   const load = React.useCallback(async () => {
     hasLoadedRef.current = true;
+    const requestId = ++requestIdRef.current;
     setStatus("loading");
     setError(null);
 
     const result = await getCart();
+
+    // Adding several items in quick succession fires several overlapping
+    // loads (one per "cart added" event); network timing doesn't guarantee
+    // they resolve in the order they were sent. Without this guard, an
+    // earlier request finishing last could clobber the UI with a stale,
+    // smaller cart snapshot even though the real cart already has more
+    // items — discard any response that isn't from the most recent request.
+    if (requestId !== requestIdRef.current) {
+      return;
+    }
+
     if (!result.ok) {
       setStatus("error");
       setError(result.error);

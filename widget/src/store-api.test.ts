@@ -48,8 +48,8 @@ describe("getCart", () => {
 
     expect(result.ok).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://shop.example/wp-json/wc/store/v1/cart",
-      expect.objectContaining({ method: "GET", credentials: "same-origin" }),
+      expect.stringMatching(/^https:\/\/shop\.example\/wp-json\/wc\/store\/v1\/cart\?_dgts=\d+$/),
+      expect.objectContaining({ method: "GET", credentials: "same-origin", cache: "no-store" }),
     );
   });
 
