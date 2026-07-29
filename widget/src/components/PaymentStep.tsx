@@ -181,6 +181,15 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
     const confirmPi = extractStripeConfirmPiRedirect(order.payment_result);
 
     if (confirmPi) {
+      // `confirmCardPayment` renders its 3D Secure challenge UI *inside the
+      // same iframe document* Stripe.js was loaded into (our small,
+      // 48px-tall card-input iframe) — confirmed by live testing: the bank's
+      // challenge page loaded and its own network calls succeeded, but the
+      // widget stayed stuck on "Confirming with your bank…" because the
+      // challenge content had no usable space to render/be clicked in. The
+      // "confirming" status below drives CSS that temporarily blows this
+      // iframe up into a real, centered modal for the duration of the
+      // challenge (see `dg-payment-card-iframe--confirming`).
       setStatus("confirming");
       const confirmResult = await stripeCard.confirmCardPayment(confirmPi.clientSecret);
       if (!confirmResult.ok) {
@@ -253,7 +262,16 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
             <p className="dg-cart-shipping-error">{stripeCard.errorMessage ?? "Card payment isn't available."}</p>
           ) : (
             <>
-              <iframe ref={stripeCard.iframeRef} title="Card details" className="dg-payment-card-iframe" />
+              {status === "confirming" ? <div className="dg-payment-confirming-backdrop" /> : null}
+              <iframe
+                ref={stripeCard.iframeRef}
+                title="Card details"
+                className={
+                  status === "confirming"
+                    ? "dg-payment-card-iframe dg-payment-card-iframe--confirming"
+                    : "dg-payment-card-iframe"
+                }
+              />
               {stripeCard.status === "loading" ? <p className="dg-cart-status-hint">Loading payment form…</p> : null}
             </>
           )}

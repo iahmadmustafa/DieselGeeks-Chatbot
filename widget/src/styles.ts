@@ -799,6 +799,39 @@ export const WIDGET_CSS = `
   color-scheme: dark;
 }
 
+/*
+ * stripe.confirmCardPayment() renders its 3D Secure challenge UI inside
+ * the very iframe document Stripe.js was loaded into — that's normally this
+ * 48px-tall card-input strip. Left alone, the entire bank challenge (which
+ * needs real modal-sized space, per Stripe's own docs) gets crushed into
+ * that sliver, silently un-clickable, which presented as the widget hanging
+ * forever on "Confirming with your bank…" even though the challenge's own
+ * network calls completed fine. This blows the same iframe up into an
+ * actual centered modal for the duration of the challenge; .dg-panel-open
+ * sets transform: none on every ancestor while a chat panel is open, so
+ * position: fixed here is guaranteed to anchor to the real viewport.
+ */
+.dg-payment-card-iframe--confirming {
+  position: fixed !important;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, 92vw);
+  height: min(620px, 85vh);
+  z-index: 2147483010;
+  border-radius: var(--dg-radius-lg);
+  box-shadow: var(--dg-shadow-lg);
+  background: #ffffff;
+}
+
+.dg-payment-confirming-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483009;
+  background: rgba(8, 10, 14, 0.72);
+  backdrop-filter: blur(2px);
+}
+
 .dg-payment-submit {
   width: 100%;
   justify-content: center;
