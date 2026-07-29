@@ -1,5 +1,6 @@
-import { formatStoreApiMoney, type StoreApiCart } from "../store-api";
-import type { StoreCartStatus } from "../use-store-cart";
+import { formatStoreApiMoney, type StoreApiAddress, type StoreApiCart } from "../store-api";
+import type { StoreCartMutationResult, StoreCartStatus } from "../use-store-cart";
+import { CartShippingSection } from "./CartShippingSection";
 import { CartIcon } from "./Icons";
 
 interface CartReviewProps {
@@ -8,6 +9,8 @@ interface CartReviewProps {
   error: string | null;
   onRefresh: () => void;
   onBack: () => void;
+  onUpdateAddress: (address: Partial<StoreApiAddress>) => Promise<StoreCartMutationResult>;
+  onSelectRate: (packageId: number | string, rateId: string) => Promise<StoreCartMutationResult>;
 }
 
 /**
@@ -16,7 +19,15 @@ interface CartReviewProps {
  * to the store's normal cart page so a purchase can always be completed
  * safely while later stages (address/shipping, then payment) are built.
  */
-export function CartReview({ cart, status, error, onRefresh, onBack }: CartReviewProps) {
+export function CartReview({
+  cart,
+  status,
+  error,
+  onRefresh,
+  onBack,
+  onUpdateAddress,
+  onSelectRate,
+}: CartReviewProps) {
   const cartUrl = `${window.location.origin}/cart/`;
   const isEmpty = status === "ready" && (!cart || cart.items.length === 0);
   const isPopulated = status === "ready" && !!cart && cart.items.length > 0;
@@ -95,6 +106,10 @@ export function CartReview({ cart, status, error, onRefresh, onBack }: CartRevie
                 );
               })}
             </ul>
+
+            {cart.needs_shipping ? (
+              <CartShippingSection cart={cart} onUpdateAddress={onUpdateAddress} onSelectRate={onSelectRate} />
+            ) : null}
 
             <div className="dg-cart-summary">
               <div className="dg-cart-summary-row">

@@ -1,21 +1,34 @@
 import * as React from "react";
 
 import { CART_ADDED_EVENT } from "./add-to-cart";
-import { getCart, type StoreApiCart } from "./store-api";
+import {
+  getCart,
+  selectShippingRate as selectShippingRateApi,
+  updateCustomerAddress as updateCustomerAddressApi,
+  type StoreApiAddress,
+  type StoreApiCart,
+} from "./store-api";
 
 export type StoreCartStatus = "idle" | "loading" | "ready" | "error";
+
+export type StoreCartMutationResult = { ok: true } | { ok: false; error: string };
 
 export interface StoreCartState {
   status: StoreCartStatus;
   cart: StoreApiCart | null;
   error: string | null;
   refresh: () => void;
+  updateShippingAddress: (address: Partial<StoreApiAddress>) => Promise<StoreCartMutationResult>;
+  selectShippingRate: (packageId: number | string, rateId: string) => Promise<StoreCartMutationResult>;
 }
 
 /**
  * Shared cart state for the header badge and the cart-review view. Loads
  * once the widget is first opened, then stays fresh by refetching whenever
  * an item is added via `notifyCartAdded` (dispatched by add-to-cart.ts).
+ * Also exposes the stage-2 mutations (address + shipping rate selection),
+ * which update this same `cart` state from their response so every
+ * consumer (badge, cart view) stays in sync without a extra refetch.
  */
 export function useStoreCart(enabled: boolean): StoreCartState {
   const [status, setStatus] = React.useState<StoreCartStatus>("idle");
@@ -68,5 +81,38 @@ export function useStoreCart(enabled: boolean): StoreCartState {
     return () => window.removeEventListener(CART_ADDED_EVENT, handleCartAdded);
   }, [load]);
 
-  return { status, cart, error, refresh: () => void load() };
+  const updateShippingAddress = React.useCallback(
+    async (address: Partial<StoreApiAddress>): Promise<StoreCartMutationResult> => {
+      const result = await updateCustomerAddressApi({ shipping_address: address });
+      if (!result.ok) {
+        return { ok: false, error: result.error };
+      }
+      setCart(result.cart);
+      setStatus("ready");
+      return { ok: true };
+    },
+    [],
+  );
+
+  const selectShippingRate = React.useCallback(
+    async (packageId: number | string, rateId: string): Promise<StoreCartMutationResult> => {
+      const result = await selectShippingRateApi(packageId, rateId);
+      if (!result.ok) {
+        return { ok: false, error: result.error };
+      }
+      setCart(result.cart);
+      setStatus("ready");
+      return { ok: true };
+    },
+    [],
+  );
+
+  return {
+    status,
+    cart,
+    error,
+    refresh: () => void load(),
+    updateShippingAddress,
+    selectShippingRate,
+  };
 }

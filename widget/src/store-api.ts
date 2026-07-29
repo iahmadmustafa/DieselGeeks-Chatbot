@@ -1,12 +1,14 @@
 /**
- * Minimal client for WooCommerce's Store API (`/wp-json/wc/store/v1`).
+ * Client for WooCommerce's Store API (`/wp-json/wc/store/v1`).
  *
- * This is the *read-only* slice used for in-chat cart review (stage 1 of the
- * in-chat checkout project). It intentionally only covers `GET /cart` — no
- * mutating calls yet. Mutating Store API calls (add/update/remove items,
- * addresses, checkout) require a `Nonce` header created server-side via
- * `wp_create_nonce('wc_store_api')`, or a `Cart-Token` obtained from this
- * same GET response's `Cart-Token` header; that comes in a later stage.
+ * Covers stage 1 (read-only cart) and stage 2 (address + shipping) of the
+ * in-chat checkout project. Mutating calls (`update-customer`,
+ * `select-shipping-rate`) require either a `Nonce` header created
+ * server-side via `wp_create_nonce('wc_store_api')`, or a `Cart-Token`
+ * returned in the response headers of any prior Store API call — we use the
+ * latter, since it needs no WordPress-side changes and is what WooCommerce's
+ * own docs recommend for headless/JS clients:
+ * https://developer.woocommerce.com/docs/apis/store-api/nonce-tokens/
  *
  * The Store API lives on the WordPress/WooCommerce host itself (not our
  * Next.js `apiBase`), so all calls are relative to `window.location.origin`.
@@ -68,6 +70,45 @@ export interface StoreApiCartTotals extends StoreApiCurrency {
   total_tax: string;
 }
 
+export interface StoreApiAddress {
+  first_name: string;
+  last_name: string;
+  company: string;
+  address_1: string;
+  address_2: string;
+  city: string;
+  state: string;
+  postcode: string;
+  country: string;
+  phone?: string;
+  email?: string;
+}
+
+export interface StoreApiShippingRate {
+  rate_id: string;
+  name: string;
+  description: string;
+  delivery_time: string;
+  price: string;
+  taxes: string;
+  instance_id: number;
+  method_id: string;
+  selected: boolean;
+  currency_code: string;
+  currency_symbol: string;
+  currency_minor_unit: number;
+  currency_decimal_separator: string;
+  currency_thousand_separator: string;
+  currency_prefix: string;
+  currency_suffix: string;
+}
+
+export interface StoreApiShippingPackage {
+  package_id: number | string;
+  name: string;
+  shipping_rates: StoreApiShippingRate[];
+}
+
 export interface StoreApiCart {
   items: StoreApiCartItem[];
   items_count: number;
@@ -75,6 +116,9 @@ export interface StoreApiCart {
   needs_shipping: boolean;
   needs_payment: boolean;
   has_calculated_shipping: boolean;
+  shipping_address: StoreApiAddress;
+  billing_address: StoreApiAddress;
+  shipping_rates: StoreApiShippingPackage[];
   totals: StoreApiCartTotals;
   errors: Array<{ code: string; message: string }>;
 }
@@ -93,41 +137,135 @@ function getStoreApiUrl(path: string): string {
 }
 
 /**
- * Fetches the current cart. Never throws — callers get a discriminated
- * result so loading/error UI state stays simple and can't get stuck, the
- * same defensive pattern used by `addProductToCart`.
+ * WooCommerce issues a fresh `Cart-Token` on every Store API response. We
+ * cache the latest one in memory and send it back on every subsequent
+ * mutating call — this is what authorizes writes (add/update/remove,
+ * addresses, shipping) instead of the `Nonce` header, and needs no
+ * WordPress-side code changes.
  */
-export async function getCart(): Promise<StoreApiCartResult> {
+let cachedCartToken: string | null = null;
+
+function captureCartToken(response: Response): void {
+  const token = response.headers.get("Cart-Token");
+  if (token) {
+    cachedCartToken = token;
+  }
+}
+
+interface StoreApiRequestSuccess<T> {
+  ok: true;
+  data: T;
+}
+
+interface StoreApiRequestFailure {
+  ok: false;
+  error: string;
+}
+
+type StoreApiRequestResult<T> = StoreApiRequestSuccess<T> | StoreApiRequestFailure;
+
+function extractErrorMessage(data: unknown, status: number): string {
+  if (data && typeof data === "object" && "message" in data) {
+    const message = (data as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+  return `Request failed (${status}).`;
+}
+
+/**
+ * Shared request plumbing for every Store API call. Never throws — every
+ * caller gets a discriminated result, the same defensive pattern used by
+ * `addProductToCart`, so loading/error UI state can't get stuck.
+ */
+async function storeApiRequest<T>(path: string, init: RequestInit): Promise<StoreApiRequestResult<T>> {
   let response: Response;
   try {
-    response = await fetch(getStoreApiUrl("/cart"), {
-      method: "GET",
+    const headers = new Headers(init.headers);
+    headers.set("Accept", "application/json");
+    if (cachedCartToken) {
+      headers.set("Cart-Token", cachedCartToken);
+    }
+
+    response = await fetch(getStoreApiUrl(path), {
+      ...init,
+      headers,
       credentials: "same-origin",
       cache: "no-store",
-      headers: { Accept: "application/json" },
     });
   } catch (networkError) {
     console.error(`${LOG_PREFIX} network error`, networkError);
-    return { ok: false, error: "Could not load your cart. Check your connection and try again." };
+    return { ok: false, error: "Could not connect. Check your connection and try again." };
   }
 
+  captureCartToken(response);
+
+  let data: unknown = null;
   try {
-    if (!response.ok) {
-      console.warn(`${LOG_PREFIX} unexpected status`, response.status);
-      return { ok: false, error: "Could not load your cart right now." };
-    }
-
-    const data: unknown = await response.json();
-    if (!data || typeof data !== "object" || !Array.isArray((data as StoreApiCart).items)) {
-      console.warn(`${LOG_PREFIX} unexpected cart response shape`, data);
-      return { ok: false, error: "Could not read your cart data." };
-    }
-
-    return { ok: true, cart: data as StoreApiCart };
+    data = await response.json();
   } catch (parseError) {
-    console.error(`${LOG_PREFIX} failed to parse cart response`, parseError);
+    if (response.ok) {
+      console.error(`${LOG_PREFIX} failed to parse response`, parseError);
+      return { ok: false, error: "Could not read the response." };
+    }
+  }
+
+  if (!response.ok) {
+    console.warn(`${LOG_PREFIX} request failed`, { path, status: response.status, data });
+    return { ok: false, error: extractErrorMessage(data, response.status) };
+  }
+
+  return { ok: true, data: data as T };
+}
+
+function toCartResult(result: StoreApiRequestResult<StoreApiCart>): StoreApiCartResult {
+  if (!result.ok) {
+    return result;
+  }
+
+  if (!result.data || !Array.isArray(result.data.items)) {
+    console.warn(`${LOG_PREFIX} unexpected cart response shape`, result.data);
     return { ok: false, error: "Could not read your cart data." };
   }
+
+  return { ok: true, cart: result.data };
+}
+
+/** Fetches the current cart. This is the only call that needs no Cart-Token. */
+export async function getCart(): Promise<StoreApiCartResult> {
+  const result = await storeApiRequest<StoreApiCart>("/cart", { method: "GET" });
+  return toCartResult(result);
+}
+
+/**
+ * Updates the cart's shipping (and optionally billing) address, which
+ * triggers WooCommerce to recalculate shipping rates and tax. Only send the
+ * fields you have — omitted fields keep their existing server-side value.
+ */
+export async function updateCustomerAddress(address: {
+  shipping_address?: Partial<StoreApiAddress>;
+  billing_address?: Partial<StoreApiAddress>;
+}): Promise<StoreApiCartResult> {
+  const result = await storeApiRequest<StoreApiCart>("/cart/update-customer", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(address),
+  });
+  return toCartResult(result);
+}
+
+/** Selects a shipping rate for a package; returns the cart with updated totals. */
+export async function selectShippingRate(
+  packageId: number | string,
+  rateId: string,
+): Promise<StoreApiCartResult> {
+  const result = await storeApiRequest<StoreApiCart>("/cart/select-shipping-rate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ package_id: packageId, rate_id: rateId }),
+  });
+  return toCartResult(result);
 }
 
 /**

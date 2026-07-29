@@ -553,6 +553,131 @@ export const WIDGET_CSS = `
   white-space: nowrap;
 }
 
+/* ---------- Cart shipping (stage 2) ---------- */
+
+.dg-cart-shipping {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: var(--dg-radius-md);
+  background: var(--dg-surface-2);
+  border: 1px solid var(--dg-border);
+}
+
+.dg-cart-shipping-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--dg-text);
+}
+
+.dg-cart-address-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.dg-cart-address-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.dg-cart-address-row-3 {
+  grid-template-columns: 1.4fr 0.8fr 1fr;
+}
+
+.dg-cart-address-form input,
+.dg-cart-address-form select {
+  min-height: 2.4rem;
+  border-radius: var(--dg-radius-sm);
+  border: 1px solid var(--dg-border-strong);
+  background: var(--dg-bg-soft);
+  color: var(--dg-text);
+  padding: 0.5rem 0.6rem;
+  font: inherit;
+  font-size: 0.8rem;
+  width: 100%;
+}
+
+.dg-cart-address-form input::placeholder {
+  color: var(--dg-muted);
+}
+
+.dg-cart-address-form input:focus,
+.dg-cart-address-form select:focus {
+  outline: none;
+  border-color: var(--dg-accent);
+  box-shadow: 0 0 0 3px var(--dg-accent-soft);
+}
+
+.dg-cart-shipping-submit {
+  align-self: flex-start;
+}
+
+.dg-cart-shipping-error {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #fca5a5;
+}
+
+.dg-cart-shipping-empty {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--dg-muted);
+}
+
+.dg-cart-shipping-rates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--dg-border);
+}
+
+.dg-cart-shipping-package-name {
+  margin: 0 0 0.15rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--dg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.dg-cart-shipping-rate {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: var(--dg-radius-sm);
+  border: 1px solid var(--dg-border);
+  background: var(--dg-surface);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.dg-cart-shipping-rate:has(input:checked) {
+  border-color: var(--dg-accent);
+  background: var(--dg-accent-soft);
+}
+
+.dg-cart-shipping-rate input[type="radio"] {
+  accent-color: var(--dg-accent);
+  flex-shrink: 0;
+}
+
+.dg-cart-shipping-rate-name {
+  flex: 1;
+  color: var(--dg-text-secondary);
+}
+
+.dg-cart-shipping-rate-price {
+  font-weight: 700;
+  color: var(--dg-text);
+  font-variant-numeric: tabular-nums;
+}
+
 .dg-cart-summary {
   display: flex;
   flex-direction: column;

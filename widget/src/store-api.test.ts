@@ -12,11 +12,17 @@ const AUD: StoreApiCurrency = {
   currency_suffix: "",
 };
 
-function stubFetchJson(options: { status?: number; ok?: boolean; body: unknown }) {
+function stubFetchJson(options: {
+  status?: number;
+  ok?: boolean;
+  body: unknown;
+  cartToken?: string | null;
+}) {
   const fetchMock = vi.fn().mockResolvedValue({
     status: options.status ?? 200,
     ok: options.ok ?? true,
     json: async () => options.body,
+    headers: { get: (name: string) => (name === "Cart-Token" ? (options.cartToken ?? null) : null) },
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
@@ -88,16 +94,11 @@ describe("getCart", () => {
 
   it("never rejects on a network error", async () => {
     stubWindow();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockRejectedValue(new Error("network down")),
-    );
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
 
     const { getCart } = await import("./store-api");
 
-    await expect(getCart()).resolves.toEqual(
-      expect.objectContaining({ ok: false }),
-    );
+    await expect(getCart()).resolves.toEqual(expect.objectContaining({ ok: false }));
   });
 
   it("never rejects when the response body cannot be parsed as JSON", async () => {
@@ -110,12 +111,102 @@ describe("getCart", () => {
         json: async () => {
           throw new Error("invalid json");
         },
+        headers: { get: () => null },
       }),
     );
 
     const { getCart } = await import("./store-api");
 
-    await expect(getCart()).resolves.toEqual(
+    await expect(getCart()).resolves.toEqual(expect.objectContaining({ ok: false }));
+  });
+});
+
+describe("updateCustomerAddress and selectShippingRate", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("captures the Cart-Token from a GET /cart response and replays it on the next write", async () => {
+    stubWindow();
+    const fetchMock = stubFetchJson({
+      body: { items: [], items_count: 0 },
+      cartToken: "token-abc",
+    });
+
+    const { getCart, updateCustomerAddress } = await import("./store-api");
+    await getCart();
+
+    stubFetchJson({ body: { items: [], items_count: 0, shipping_address: {} } });
+    await updateCustomerAddress({ shipping_address: { postcode: "2500" } });
+
+    const secondCallHeaders = fetchMock.mock.calls[0]?.[1]?.headers as Headers | undefined;
+    // First call (getCart) had no token yet, so it shouldn't send one.
+    expect(secondCallHeaders?.get?.("Cart-Token")).toBeFalsy();
+  });
+
+  it("sends a previously captured Cart-Token on update-customer", async () => {
+    stubWindow();
+    stubFetchJson({ body: { items: [] }, cartToken: "token-xyz" });
+    const { getCart, updateCustomerAddress } = await import("./store-api");
+    await getCart();
+
+    const fetchMock = stubFetchJson({ body: { items: [], shipping_address: {} } });
+    await updateCustomerAddress({ shipping_address: { city: "Sydney" } });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/cart/update-customer");
+    const headers = init.headers as Headers;
+    expect(headers.get("Cart-Token")).toBe("token-xyz");
+  });
+
+  it("returns the updated cart on a successful address update", async () => {
+    stubWindow();
+    stubFetchJson({ body: { items: [] } });
+    const { updateCustomerAddress } = await import("./store-api");
+
+    const result = await updateCustomerAddress({ shipping_address: { postcode: "2500" } });
+
+    expect(result.ok).toBe(true);
+  });
+
+  it("surfaces the API error message on a failed address update", async () => {
+    stubWindow();
+    stubFetchJson({ ok: false, status: 400, body: { message: "Invalid postcode" } });
+    const { updateCustomerAddress } = await import("./store-api");
+
+    const result = await updateCustomerAddress({ shipping_address: { postcode: "not-a-postcode" } });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("Invalid postcode");
+    }
+  });
+
+  it("selects a shipping rate and returns the updated cart", async () => {
+    stubWindow();
+    const fetchMock = stubFetchJson({ body: { items: [], totals: { total_shipping: "1000" } } });
+    const { selectShippingRate } = await import("./store-api");
+
+    const result = await selectShippingRate(0, "flat_rate:1");
+
+    expect(result.ok).toBe(true);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/cart/select-shipping-rate");
+    expect(JSON.parse(init.body as string)).toEqual({ package_id: 0, rate_id: "flat_rate:1" });
+  });
+
+  it("never rejects on a network error during a mutation", async () => {
+    stubWindow();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    const { updateCustomerAddress } = await import("./store-api");
+
+    await expect(updateCustomerAddress({ shipping_address: {} })).resolves.toEqual(
       expect.objectContaining({ ok: false }),
     );
   });
