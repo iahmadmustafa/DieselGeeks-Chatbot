@@ -1,23 +1,33 @@
 import * as React from "react";
-import { loadStripe, type Stripe, type StripeCardElement } from "@stripe/stripe-js";
+import type { Stripe, StripeCardElement, StripeConstructorOptions } from "@stripe/stripe-js";
 
 import { resolveStripePublishableKey } from "./config";
 
 const LOG_PREFIX = "[dieselgeeks-chat:stripe]";
+const STRIPE_JS_SRC = "https://js.stripe.com/v3/";
+
+type StripeConstructor = (publishableKey: string, options?: StripeConstructorOptions) => Stripe;
+
+interface IframeWindowWithStripe extends Window {
+  Stripe?: StripeConstructor;
+}
 
 /**
  * Stripe.js refuses to mount an Element inside a Shadow DOM (confirmed via
  * the stage-2 proof of concept — `IntegrationError: Elements cannot be
  * mounted in a ShadowRoot`). A same-origin, `src`-less `<iframe>` sidesteps
  * this: it's a real `document` (satisfies Stripe's check) that's still part
- * of this same window/script context (no CORS, no separate hosted page, no
- * postMessage plumbing needed) and gets full CSS isolation from the host
- * page as a bonus. This injects a minimal stylesheet so the mounted Card
- * Element isn't stuck with the browser's unstyled default `<iframe>` body.
+ * of this same window/script context (no CORS, no separate hosted page) and
+ * gets full CSS isolation from the host page as a bonus. This injects a
+ * minimal stylesheet so the mounted Card Element isn't stuck with the
+ * browser's unstyled default `<iframe>` body.
  */
-function prepareIframeDocument(iframe: HTMLIFrameElement): HTMLElement | null {
+function prepareIframeDocument(
+  iframe: HTMLIFrameElement,
+): { doc: Document; win: IframeWindowWithStripe; mount: HTMLElement } | null {
   const doc = iframe.contentDocument;
-  if (!doc) {
+  const win = iframe.contentWindow as IframeWindowWithStripe | null;
+  if (!doc || !win) {
     return null;
   }
 
@@ -27,7 +37,52 @@ function prepareIframeDocument(iframe: HTMLIFrameElement): HTMLElement | null {
 
   const mount = doc.createElement("div");
   doc.body.appendChild(mount);
-  return mount;
+  return { doc, win, mount };
+}
+
+/**
+ * Loads Stripe.js *inside* the iframe's own document/window, instead of
+ * reusing the copy `@stripe/stripe-js`'s `loadStripe()` would load into the
+ * top-level page.
+ *
+ * This is the fix for a real bug found in testing: the card field visually
+ * rendered fine and accepted typing, but `cardComplete` never became `true`
+ * no matter how valid the entered card was — the Pay button stayed
+ * permanently disabled. Root cause: Stripe Elements relay their events
+ * (`ready`, `change`, etc.) back to the window that called
+ * `stripe.elements()`, via `postMessage` from the Element's own internal
+ * iframe, assuming that iframe is a *direct* child of that window. We were
+ * loading Stripe.js in the top-level page but mounting the Element one
+ * level deeper — inside our own custom iframe — so Stripe's internal iframe
+ * ended up two levels down from the window holding the JS listeners.
+ * Visual rendering and keystrokes still worked (they don't depend on this
+ * relay), but the completeness events silently never arrived. Instantiating
+ * Stripe.js inside the same custom iframe keeps the Elements object and its
+ * DOM exactly one level apart, matching what Stripe expects.
+ */
+function loadStripeInWindow(
+  win: IframeWindowWithStripe,
+  doc: Document,
+  publishableKey: string,
+): Promise<Stripe> {
+  return new Promise((resolve, reject) => {
+    if (win.Stripe) {
+      resolve(win.Stripe(publishableKey));
+      return;
+    }
+
+    const script = doc.createElement("script");
+    script.src = STRIPE_JS_SRC;
+    script.onload = () => {
+      if (!win.Stripe) {
+        reject(new Error("Stripe.js did not initialize."));
+        return;
+      }
+      resolve(win.Stripe(publishableKey));
+    };
+    script.onerror = () => reject(new Error("Could not load Stripe.js."));
+    doc.head.appendChild(script);
+  });
 }
 
 export type StripeCardStatus = "unavailable" | "loading" | "ready" | "error";
@@ -82,25 +137,24 @@ export function useStripeCardElement(): StripeCardElementState {
 
     async function run() {
       try {
-        const stripe = await loadStripe(publishableKey as string);
-        if (cancelled) {
-          return;
-        }
-        if (!stripe) {
-          setStatus("error");
-          setErrorMessage("Could not initialize the payment form.");
-          return;
-        }
-        stripeRef.current = stripe;
-
         const iframe = iframeRef.current;
-        const mount = iframe ? prepareIframeDocument(iframe) : null;
-        if (!mount) {
+        const prepared = iframe ? prepareIframeDocument(iframe) : null;
+        if (!prepared) {
           setStatus("error");
           setErrorMessage("Could not prepare the payment form.");
           return;
         }
+        if (cancelled) {
+          return;
+        }
 
+        const stripe = await loadStripeInWindow(prepared.win, prepared.doc, publishableKey);
+        if (cancelled) {
+          return;
+        }
+        stripeRef.current = stripe;
+
+        const { mount } = prepared;
         const elements = stripe.elements();
         const card = elements.create("card", {
           // Stripe's Card Element includes a postal-code sub-field by
