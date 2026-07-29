@@ -36,13 +36,20 @@ function refreshWooCommerceCartFragments(
     return;
   }
 
-  jq.each(fragments, (selector, html) => {
-    jq(selector).replaceWith(html);
-  });
+  // Fragment refresh is a best-effort UI enhancement on the host page — never
+  // let it fail the add-to-cart result (e.g. selectors that don't exist on
+  // this theme, or jQuery internals throwing on an unexpected fragment shape).
+  try {
+    jq.each(fragments, (selector, html) => {
+      jq(selector).replaceWith(html);
+    });
 
-  (jq as (target: HTMLElement) => { trigger: (event: string, args?: unknown[]) => void })(
-    document.body,
-  ).trigger("added_to_cart", [fragments, cartHash]);
+    (jq as (target: HTMLElement) => { trigger: (event: string, args?: unknown[]) => void })(
+      document.body,
+    ).trigger("added_to_cart", [fragments, cartHash]);
+  } catch (fragmentError) {
+    console.warn(`${LOG_PREFIX} failed to refresh cart fragments`, fragmentError);
+  }
 }
 
 /**
@@ -96,6 +103,12 @@ function extractJsonPayload(rawText: string): WooAddToCartPayload | null {
   return tryParse(trimmed.slice(firstBrace, lastBrace + 1));
 }
 
+/**
+ * This function must never throw/reject — callers use the result to reset
+ * button/loading state, and an unhandled rejection would leave the UI stuck
+ * on "Adding..." forever. Every step after the network call is wrapped so a
+ * parsing or DOM-integration failure degrades to a safe result instead.
+ */
 export async function addProductToCart(productId: number): Promise<AddToCartResult> {
   const body = new URLSearchParams();
   body.set("product_id", String(productId));
@@ -116,39 +129,47 @@ export async function addProductToCart(productId: number): Promise<AddToCartResu
     return { ok: false, error: "Could not add item to cart." };
   }
 
-  const rawText = await response.text();
+  try {
+    const rawText = await response.text();
 
-  // eslint-disable-next-line no-console -- intentional debugging aid for diagnosing site-specific response shapes
-  console.log(`${LOG_PREFIX} raw response`, {
-    status: response.status,
-    ok: response.ok,
-    body: rawText,
-  });
+    // eslint-disable-next-line no-console -- intentional debugging aid for diagnosing site-specific response shapes
+    console.log(`${LOG_PREFIX} raw response`, {
+      status: response.status,
+      ok: response.ok,
+      body: rawText,
+    });
 
-  const data = extractJsonPayload(rawText);
+    const data = extractJsonPayload(rawText);
 
-  if (data && hasExplicitError(data.error)) {
-    console.warn(`${LOG_PREFIX} WooCommerce reported an error`, data.error);
-    return {
-      ok: false,
-      error: typeof data.error === "string" && data.error.trim() ? data.error : "Could not add item to cart.",
-    };
+    if (data && hasExplicitError(data.error)) {
+      console.warn(`${LOG_PREFIX} WooCommerce reported an error`, data.error);
+      return {
+        ok: false,
+        error:
+          typeof data.error === "string" && data.error.trim() ? data.error : "Could not add item to cart.",
+      };
+    }
+
+    if (data) {
+      refreshWooCommerceCartFragments(data.fragments, data.cart_hash);
+      return { ok: true };
+    }
+
+    if (response.ok) {
+      console.warn(
+        `${LOG_PREFIX} response body was not valid JSON, but HTTP status was OK — treating as success`,
+      );
+      return { ok: true };
+    }
+
+    console.warn(`${LOG_PREFIX} response body was not valid JSON and HTTP status was not OK`);
+    return { ok: false, error: "Could not add item to cart." };
+  } catch (processingError) {
+    console.error(`${LOG_PREFIX} failed to process add-to-cart response`, processingError);
+    // The server call went through (fetch succeeded); only response
+    // handling failed, so surface it as success rather than a false failure.
+    return response.ok ? { ok: true } : { ok: false, error: "Could not add item to cart." };
   }
-
-  if (data) {
-    refreshWooCommerceCartFragments(data.fragments, data.cart_hash);
-    return { ok: true };
-  }
-
-  if (response.ok) {
-    console.warn(
-      `${LOG_PREFIX} response body was not valid JSON, but HTTP status was OK — treating as success`,
-    );
-    return { ok: true };
-  }
-
-  console.warn(`${LOG_PREFIX} response body was not valid JSON and HTTP status was not OK`);
-  return { ok: false, error: "Could not add item to cart." };
 }
 
 export function notifyCartAdded(detail: CartAddedDetail): void {

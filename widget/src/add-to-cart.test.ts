@@ -168,6 +168,38 @@ describe("addProductToCart success detection", () => {
     );
   });
 
+  it("never rejects when the response body cannot be read", async () => {
+    stubWindow();
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      text: async () => {
+        throw new Error("stream already consumed");
+      },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { addProductToCart } = await import("./add-to-cart");
+
+    await expect(addProductToCart(123)).resolves.toEqual({ ok: true });
+  });
+
+  it("never rejects when cart fragment refresh throws", async () => {
+    stubWindow({
+      jQuery: Object.assign(
+        (_selector: string) => {
+          throw new Error("selector not found");
+        },
+        { each: (_fragments: unknown, _cb: unknown) => undefined },
+      ),
+    });
+    stubFetchResponse({ body: JSON.stringify({ fragments: { ".cart": "<div/>" } }) });
+
+    const { addProductToCart } = await import("./add-to-cart");
+
+    await expect(addProductToCart(123)).resolves.toEqual({ ok: true });
+  });
+
   it("uses wc_add_to_cart_params when available", async () => {
     stubWindow({
       wc_add_to_cart_params: {

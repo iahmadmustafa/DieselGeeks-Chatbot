@@ -41,18 +41,26 @@ export function ProductCardView({ product }: { product: ProductCard }) {
     setAddError(null);
     setIsAdding(true);
 
-    const result = await addProductToCart(product.id);
-    setIsAdding(false);
+    try {
+      const result = await addProductToCart(product.id);
 
-    if (!result.ok) {
-      setAddError(result.error ?? "Could not add item to cart.");
-      return;
+      if (!result.ok) {
+        setAddError(result.error ?? "Could not add item to cart.");
+        return;
+      }
+
+      notifyCartAdded({
+        productId: product.id,
+        productTitle: product.title,
+      });
+    } catch (error) {
+      // addProductToCart is designed to never throw, but guard anyway so the
+      // button can never get stuck on "Adding..." if something unexpected happens.
+      console.error("[dieselgeeks-chat:add-to-cart] unexpected error", error);
+      setAddError("Could not add item to cart.");
+    } finally {
+      setIsAdding(false);
     }
-
-    notifyCartAdded({
-      productId: product.id,
-      productTitle: product.title,
-    });
   }
 
   return (
