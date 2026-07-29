@@ -2,6 +2,11 @@ import * as React from "react";
 
 import { addProductToCart, notifyCartAdded } from "../add-to-cart";
 import type { ProductCard } from "../types";
+import { CartIcon, CheckIcon } from "./Icons";
+
+const SUCCESS_DISPLAY_MS = 1600;
+
+type AddState = "idle" | "adding" | "added";
 
 function formatPrice(price: string): string {
   const numeric = Number(price);
@@ -30,22 +35,32 @@ function stockLabel(status: string): { label: string; className: string } {
 
 export function ProductCardView({ product }: { product: ProductCard }) {
   const stock = stockLabel(product.stock_status);
-  const [isAdding, setIsAdding] = React.useState(false);
+  const [addState, setAddState] = React.useState<AddState>("idle");
   const [addError, setAddError] = React.useState<string | null>(null);
+  const successTimeoutRef = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current !== null) {
+        window.clearTimeout(successTimeoutRef.current);
+      }
+    };
+  }, []);
 
   async function handleAddToCart(): Promise<void> {
-    if (isAdding) {
+    if (addState === "adding") {
       return;
     }
 
     setAddError(null);
-    setIsAdding(true);
+    setAddState("adding");
 
     try {
       const result = await addProductToCart(product.id);
 
       if (!result.ok) {
         setAddError(result.error ?? "Could not add item to cart.");
+        setAddState("idle");
         return;
       }
 
@@ -53,13 +68,18 @@ export function ProductCardView({ product }: { product: ProductCard }) {
         productId: product.id,
         productTitle: product.title,
       });
+
+      setAddState("added");
+      successTimeoutRef.current = window.setTimeout(() => {
+        setAddState("idle");
+        successTimeoutRef.current = null;
+      }, SUCCESS_DISPLAY_MS);
     } catch (error) {
       // addProductToCart is designed to never throw, but guard anyway so the
       // button can never get stuck on "Adding..." if something unexpected happens.
       console.error("[dieselgeeks-chat:add-to-cart] unexpected error", error);
       setAddError("Could not add item to cart.");
-    } finally {
-      setIsAdding(false);
+      setAddState("idle");
     }
   }
 
@@ -77,10 +97,12 @@ export function ProductCardView({ product }: { product: ProductCard }) {
         <h4 className="dg-product-title">{product.title}</h4>
 
         <div className="dg-product-meta">
-          <span className="dg-price">{formatPrice(product.price)}</span>
-          {product.sale_price ? (
-            <span className="dg-price-sale">{formatPrice(product.sale_price)}</span>
-          ) : null}
+          <span className="dg-price-group">
+            <span className="dg-price">{formatPrice(product.price)}</span>
+            {product.sale_price ? (
+              <span className="dg-price-sale">{formatPrice(product.sale_price)}</span>
+            ) : null}
+          </span>
           <span className={`dg-stock ${stock.className}`}>{stock.label}</span>
         </div>
 
@@ -95,11 +117,26 @@ export function ProductCardView({ product }: { product: ProductCard }) {
           {product.stock_status === "instock" ? (
             <button
               type="button"
-              className="dg-btn dg-btn-primary"
+              className={`dg-btn ${addState === "added" ? "dg-btn-success" : "dg-btn-primary"}`}
               onClick={() => void handleAddToCart()}
-              disabled={isAdding}
+              disabled={addState === "adding"}
             >
-              {isAdding ? "Adding..." : "Add to cart"}
+              {addState === "adding" ? (
+                <>
+                  <span className="dg-spinner" aria-hidden="true" />
+                  Adding
+                </>
+              ) : addState === "added" ? (
+                <>
+                  <CheckIcon className="dg-btn-icon" />
+                  Added
+                </>
+              ) : (
+                <>
+                  <CartIcon className="dg-btn-icon" />
+                  Add to cart
+                </>
+              )}
             </button>
           ) : null}
         </div>

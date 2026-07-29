@@ -40,15 +40,28 @@ export function App({ apiBase }: { apiBase: string }) {
 
   return (
     <div className="dg-root">
-      <CartToast />
+      <CartToast isChatOpen={isOpen} />
       <button
         type="button"
-        className="dg-launcher"
+        className={`dg-launcher${isOpen ? " dg-launcher-open" : ""}`}
         onClick={() => setIsOpen((open) => !open)}
         aria-expanded={isOpen}
         aria-controls="dieselgeeks-chat-panel"
       >
-        <BrandLogo className="dg-launcher-logo" logoUrl={logoUrl} />
+        <span className="dg-launcher-icon-wrap">
+          <BrandLogo className="dg-launcher-logo" logoUrl={logoUrl} />
+          <span className="dg-launcher-close-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M4 4l8 8M12 4l-8 8"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          </span>
+          {isOpen ? null : <span className="dg-launcher-status-dot" aria-hidden="true" />}
+        </span>
         <span className="dg-launcher-text">
           <span className="dg-launcher-title">Dr Diesel</span>
           <span className="dg-launcher-subtitle">Diesel injector &amp; fuel system specialist</span>

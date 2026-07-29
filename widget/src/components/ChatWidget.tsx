@@ -5,12 +5,20 @@ import { useChat } from "@ai-sdk/react";
 
 import { getOrCreateSessionId } from "../session";
 import { loadStoredConversation, saveStoredConversation } from "../conversation-storage";
+import { renderMessageBody } from "../format-message";
 import type { ChatUIMessage, ProductCard } from "../types";
 import { ProductCardView } from "./ProductCard";
 import { BrandLogo } from "./BrandLogo";
 import { TypingIndicator } from "./TypingIndicator";
+import { FuelIcon } from "./Icons";
 
 const MAX_MESSAGE_LENGTH = 500;
+
+const STARTER_PROMPTS = [
+  "Find injectors for my vehicle",
+  "Ask about a part number",
+  "Check fitment for my ute",
+];
 
 function getMessageText(message: ChatUIMessage): string {
   return message.parts
@@ -50,22 +58,6 @@ function getProductsFromMessage(message: ChatUIMessage): ProductCard[] {
   });
 }
 
-function linkifyText(text: string): React.ReactNode[] {
-  const urlPattern = /(https?:\/\/[^\s]+)/g;
-  const parts = text.split(urlPattern);
-
-  return parts.map((part, index) => {
-    if (part.match(urlPattern)) {
-      return (
-        <a key={`link-${index}`} href={part} target="_blank" rel="noopener noreferrer">
-          {part}
-        </a>
-      );
-    }
-    return <span key={`text-${index}`}>{part}</span>;
-  });
-}
-
 interface ChatWidgetProps {
   apiBase: string;
   logoUrl: string;
@@ -96,6 +88,12 @@ export function ChatWidget({ apiBase, logoUrl, isOpen, isMobile, onClose }: Chat
   const [input, setInput] = React.useState("");
   const messagesEndRef = React.useRef<HTMLDivElement | null>(null);
   const isBusy = status === "submitted" || status === "streaming";
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : undefined;
+  const lastMessageId = lastMessage?.id;
+  const lastMessageHasContent =
+    lastMessage?.role === "assistant" &&
+    (getMessageText(lastMessage).length > 0 || getProductsFromMessage(lastMessage).length > 0);
+  const showTypingIndicator = status === "submitted" || (status === "streaming" && !lastMessageHasContent);
 
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -115,6 +113,15 @@ export function ChatWidget({ apiBase, logoUrl, isOpen, isMobile, onClose }: Chat
     };
   }, [sessionId, messages]);
 
+  async function submitText(rawText: string): Promise<void> {
+    const trimmed = rawText.trim();
+    if (!trimmed || isBusy) {
+      return;
+    }
+
+    await sendMessage({ text: trimmed.slice(0, MAX_MESSAGE_LENGTH) });
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     const trimmed = input.trim();
@@ -123,11 +130,11 @@ export function ChatWidget({ apiBase, logoUrl, isOpen, isMobile, onClose }: Chat
     }
 
     setInput("");
-    await sendMessage({ text: trimmed.slice(0, MAX_MESSAGE_LENGTH) });
+    await submitText(trimmed);
   }
 
   const panelClass = isMobile ? "dg-panel dg-panel-mobile" : "dg-panel dg-panel-desktop";
-  const panelStateClass = isOpen ? "" : " dg-panel-hidden";
+  const panelStateClass = isOpen ? " dg-panel-open" : " dg-panel-closed";
 
   return (
     <section
@@ -135,8 +142,12 @@ export function ChatWidget({ apiBase, logoUrl, isOpen, isMobile, onClose }: Chat
       role="dialog"
       aria-label="Dr Diesel assistant"
       aria-hidden={!isOpen}
-      hidden={!isOpen}
+      inert={!isOpen}
     >
+      <div className="dg-panel-grabber" aria-hidden="true">
+        <span />
+      </div>
+
       <header className="dg-header">
         <div className="dg-header-brand">
           <div className="dg-header-logo">
@@ -144,7 +155,10 @@ export function ChatWidget({ apiBase, logoUrl, isOpen, isMobile, onClose }: Chat
           </div>
           <div className="dg-header-copy">
             <h2 className="dg-header-title">Dr Diesel</h2>
-            <p className="dg-header-subtitle">Diesel injector &amp; fuel system specialist</p>
+            <p className="dg-header-status">
+              <span className="dg-status-dot" aria-hidden="true" />
+              Online now
+            </p>
           </div>
         </div>
         <button type="button" className="dg-icon-btn" onClick={onClose} aria-label="Close chat">
@@ -157,11 +171,27 @@ export function ChatWidget({ apiBase, logoUrl, isOpen, isMobile, onClose }: Chat
       <div className="dg-messages">
         {messages.length === 0 ? (
           <div className="dg-empty">
+            <div className="dg-empty-icon">
+              <FuelIcon />
+            </div>
             <h3>Find the right diesel part</h3>
             <p>
-              Ask about injectors, pumps, fuel lines, or fitment for your ute or 4x4. I&apos;ll search
-              our live catalog and show real products with prices and stock.
+              Ask about injectors, pumps, fuel lines, or fitment for your ute or 4x4 — I&apos;ll search
+              our live catalog for real products with prices and stock.
             </p>
+            <div className="dg-empty-chips">
+              {STARTER_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  className="dg-chip"
+                  onClick={() => void submitText(prompt)}
+                  disabled={isBusy}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
           </div>
         ) : null}
 
@@ -169,6 +199,8 @@ export function ChatWidget({ apiBase, logoUrl, isOpen, isMobile, onClose }: Chat
           const text = getMessageText(message);
           const products = getProductsFromMessage(message);
           const isUser = message.role === "user";
+          const isStreamingThisMessage =
+            !isUser && status === "streaming" && message.id === lastMessageId && text.length > 0;
 
           if (!text && products.length === 0) {
             return null;
@@ -177,31 +209,54 @@ export function ChatWidget({ apiBase, logoUrl, isOpen, isMobile, onClose }: Chat
           return (
             <div
               key={message.id}
-              className={`dg-message ${isUser ? "dg-message-user" : "dg-message-assistant"}`}
+              className={`dg-message-row ${isUser ? "dg-message-row-user" : "dg-message-row-assistant"}`}
             >
-              {text ? (
-                <div className={`dg-bubble ${isUser ? "dg-bubble-user" : "dg-bubble-assistant"}`}>
-                  {isUser ? text : linkifyText(text)}
-                </div>
-              ) : null}
+              {isUser ? null : (
+                <span className="dg-avatar" aria-hidden="true">
+                  <BrandLogo logoUrl={logoUrl} />
+                </span>
+              )}
 
-              {!isUser && products.length > 0 ? (
-                <div className="dg-products">
-                  {products.map((product) => (
-                    <ProductCardView key={product.id} product={product} />
-                  ))}
-                </div>
-              ) : null}
+              <div className="dg-message">
+                {text ? (
+                  <div className={`dg-bubble ${isUser ? "dg-bubble-user" : "dg-bubble-assistant"}`}>
+                    {isUser ? (
+                      <p className="dg-msg-line">{text}</p>
+                    ) : (
+                      <>
+                        {renderMessageBody(text)}
+                        {isStreamingThisMessage ? <span className="dg-cursor" aria-hidden="true" /> : null}
+                      </>
+                    )}
+                  </div>
+                ) : null}
+
+                {!isUser && products.length > 0 ? (
+                  <div className="dg-products">
+                    {products.map((product) => (
+                      <ProductCardView key={product.id} product={product} />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             </div>
           );
         })}
 
-        {isBusy ? <TypingIndicator /> : null}
+        {showTypingIndicator ? <TypingIndicator logoUrl={logoUrl} /> : null}
         <div ref={messagesEndRef} />
       </div>
 
       <form className="dg-composer" onSubmit={handleSubmit}>
-        {error ? <p className="dg-error">Something went wrong. Please try again.</p> : null}
+        {error ? (
+          <p className="dg-error" role="alert">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.4" />
+              <path d="M8 4.5v4M8 11h.01" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+            Something went wrong. Please try again.
+          </p>
+        ) : null}
         <div className="dg-input-row">
           <textarea
             className="dg-input"
