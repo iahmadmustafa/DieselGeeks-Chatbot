@@ -130,6 +130,22 @@ export function CartReview({
                     : "Calculated at checkout"}
                 </span>
               </div>
+              {(cart.fees ?? []).map((fee) => (
+                <div className="dg-cart-summary-fee-group" key={fee.key}>
+                  {Number(fee.totals.total) !== 0 ? (
+                    <div className="dg-cart-summary-row">
+                      <span>{fee.name}</span>
+                      <span>{formatStoreApiMoney(fee.totals.total, fee.totals)}</span>
+                    </div>
+                  ) : null}
+                  {Number(fee.totals.total_tax) > 0 ? (
+                    <div className="dg-cart-summary-row">
+                      <span>{fee.name} GST</span>
+                      <span>{formatStoreApiMoney(fee.totals.total_tax, fee.totals)}</span>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
               {Number(cart.totals.total_tax) > 0 ? (
                 <div className="dg-cart-summary-row">
                   <span>Tax</span>

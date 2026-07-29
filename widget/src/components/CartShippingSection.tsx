@@ -152,13 +152,18 @@ export function CartShippingSection({ cart, onUpdateAddress, onSelectRate }: Car
 
         {addressError ? <p className="dg-cart-shipping-error">{addressError}</p> : null}
 
-        <button
-          type="submit"
-          className="dg-btn dg-btn-secondary dg-cart-shipping-submit"
-          disabled={!canSubmit || addressStatus === "saving"}
-        >
-          {addressStatus === "saving" ? "Calculating…" : "Calculate shipping"}
-        </button>
+        <div className="dg-cart-shipping-submit-row">
+          <button
+            type="submit"
+            className="dg-btn dg-btn-secondary dg-cart-shipping-submit"
+            disabled={!canSubmit || addressStatus === "saving"}
+          >
+            {addressStatus === "saving" ? "Calculating…" : "Calculate shipping"}
+          </button>
+          {!canSubmit ? (
+            <span className="dg-cart-shipping-hint">Address, suburb, state &amp; postcode are required</span>
+          ) : null}
+        </div>
       </form>
 
       {cart.has_calculated_shipping && cart.shipping_rates.length > 0 ? (

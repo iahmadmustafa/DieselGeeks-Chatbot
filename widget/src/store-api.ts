@@ -109,6 +109,15 @@ export interface StoreApiShippingPackage {
   shipping_rates: StoreApiShippingRate[];
 }
 
+export interface StoreApiCartFee {
+  key: string;
+  name: string;
+  totals: StoreApiCurrency & {
+    total: string;
+    total_tax: string;
+  };
+}
+
 export interface StoreApiCart {
   items: StoreApiCartItem[];
   items_count: number;
@@ -119,6 +128,7 @@ export interface StoreApiCart {
   shipping_address: StoreApiAddress;
   billing_address: StoreApiAddress;
   shipping_rates: StoreApiShippingPackage[];
+  fees: StoreApiCartFee[];
   totals: StoreApiCartTotals;
   errors: Array<{ code: string; message: string }>;
 }

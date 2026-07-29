@@ -612,8 +612,21 @@ export const WIDGET_CSS = `
   box-shadow: 0 0 0 3px var(--dg-accent-soft);
 }
 
+.dg-cart-shipping-submit-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
 .dg-cart-shipping-submit {
   align-self: flex-start;
+  flex-shrink: 0;
+}
+
+.dg-cart-shipping-hint {
+  font-size: 0.68rem;
+  color: var(--dg-muted);
 }
 
 .dg-cart-shipping-error {
@@ -698,6 +711,12 @@ export const WIDGET_CSS = `
 
 .dg-cart-summary-row span:last-child {
   font-variant-numeric: tabular-nums;
+}
+
+.dg-cart-summary-fee-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
 }
 
 .dg-cart-summary-total {
@@ -1174,9 +1193,15 @@ export const WIDGET_CSS = `
   border: 1px solid var(--dg-border-strong);
 }
 
-.dg-btn-secondary:hover {
+.dg-btn-secondary:hover:not(:disabled) {
   border-color: var(--dg-accent);
   color: var(--dg-accent);
+}
+
+.dg-btn-secondary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .dg-spinner {
