@@ -30,8 +30,18 @@ function extractClientSecret(order: StoreApiOrder): string | null {
   return null;
 }
 
-function addressFromShipping(shipping: StoreApiAddress, email: string): StoreApiAddress {
-  return { ...shipping, email };
+/** Splits a single "full name" input into WooCommerce's first/last name fields. */
+function splitName(fullName: string): { first_name: string; last_name: string } {
+  const trimmed = fullName.trim();
+  const spaceIndex = trimmed.indexOf(" ");
+  if (spaceIndex === -1) {
+    return { first_name: trimmed, last_name: "" };
+  }
+  return { first_name: trimmed.slice(0, spaceIndex), last_name: trimmed.slice(spaceIndex + 1).trim() };
+}
+
+function addressFromShipping(shipping: StoreApiAddress, email: string, fullName: string): StoreApiAddress {
+  return { ...shipping, ...splitName(fullName), email };
 }
 
 type PaymentStatus = "idle" | "submitting" | "confirming" | "error";
@@ -52,16 +62,22 @@ interface PaymentStepProps {
 export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
   const stripeCard = useStripeCardElement();
   const [email, setEmail] = React.useState(cart.billing_address?.email ?? "");
+  const shippingAddress = cart.needs_shipping ? cart.shipping_address : undefined;
+  const nameSource = shippingAddress ?? cart.billing_address;
+  const initialName = [nameSource?.first_name, nameSource?.last_name].filter(Boolean).join(" ").trim();
+  // A dedicated field, prefilled from the shipping address when available
+  // but always independently editable/required here — the shipping form
+  // only requires an address to calculate rates, not a name, so relying on
+  // it alone left the Pay button silently and permanently disabled whenever
+  // a shopper skipped those two optional-looking fields upstream.
+  const [fullName, setFullName] = React.useState(initialName);
   const [status, setStatus] = React.useState<PaymentStatus>("idle");
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
-  const shippingAddress = cart.needs_shipping ? cart.shipping_address : undefined;
-  const nameSource = shippingAddress ?? cart.billing_address;
-  const fullName = [nameSource?.first_name, nameSource?.last_name].filter(Boolean).join(" ").trim();
-
   const canSubmit =
     email.trim().length > 0 &&
-    fullName.length > 0 &&
+    fullName.trim().length > 0 &&
+    !!nameSource &&
     stripeCard.status === "ready" &&
     stripeCard.cardComplete &&
     status === "idle";
@@ -75,7 +91,7 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
     setStatus("submitting");
     setErrorMessage(null);
 
-    const billingAddress = addressFromShipping(nameSource, email.trim());
+    const billingAddress = addressFromShipping(nameSource, email.trim(), fullName);
 
     const paymentMethodResult = await stripeCard.createPaymentMethod({
       name: fullName,
@@ -166,6 +182,13 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
       <h4 className="dg-cart-shipping-title">Payment</h4>
 
       <form className="dg-payment-form" onSubmit={handleSubmit}>
+        <input
+          type="text"
+          placeholder="Full name on card"
+          value={fullName}
+          autoComplete="cc-name"
+          onChange={(event) => setFullName(event.target.value)}
+        />
         <input
           type="email"
           placeholder="Email for your receipt"

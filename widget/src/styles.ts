@@ -754,7 +754,8 @@ export const WIDGET_CSS = `
   gap: 0.55rem;
 }
 
-.dg-payment-form input[type="email"] {
+.dg-payment-form input[type="email"],
+.dg-payment-form input[type="text"] {
   width: 100%;
   box-sizing: border-box;
   padding: 0.6rem 0.7rem;
@@ -766,7 +767,8 @@ export const WIDGET_CSS = `
   font-family: inherit;
 }
 
-.dg-payment-form input[type="email"]:focus {
+.dg-payment-form input[type="email"]:focus,
+.dg-payment-form input[type="text"]:focus {
   outline: none;
   border-color: var(--dg-accent);
 }
