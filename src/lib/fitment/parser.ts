@@ -1,13 +1,18 @@
 import type { FitmentParseResult, NormalizedFitment, YearRange } from "@/types/catalog";
+import { fitmentRawToPlainText } from "@/lib/text/strip-html";
 
 const KNOWN_KEYS = new Set([
   "make",
   "models",
   "model",
+  "engine",
   "engine code",
+  "engine codes",
+  "engine type",
   "fuel type",
   "fuel system",
   "year range",
+  "model years",
 ]);
 
 function emptyFitment(): NormalizedFitment {
@@ -53,7 +58,11 @@ function parseYearRangeLine(line: string): { label: string; range: YearRange } |
   }
 
   const from = Number(years[0]);
-  const to = Number(years[years.length - 1]);
+  let to = Number(years[years.length - 1]);
+
+  if (years.length === 1 && /\b(end of production|present|ongoing|current)\b/i.test(value)) {
+    to = new Date().getFullYear();
+  }
 
   if (Number.isNaN(from) || Number.isNaN(to)) {
     return null;
@@ -102,8 +111,87 @@ function looksLikeYearRangeEntry(line: string): boolean {
   return parseYearRangeLine(line) !== null;
 }
 
+function assignEngineCodes(fitment: NormalizedFitment, value: string): void {
+  const codes: string[] = [];
+
+  for (const part of splitListValue(value)) {
+    const { code, note } = extractEngineCode(part);
+    if (code) {
+      codes.push(code);
+    }
+    fitment.notes = appendNote(fitment.notes, note);
+  }
+
+  fitment.engine_codes = codes;
+}
+
+function mergeUniqueValues(existing: string[], values: string[]): string[] {
+  const merged = [...existing];
+  for (const value of values) {
+    if (!merged.includes(value)) {
+      merged.push(value);
+    }
+  }
+  return merged;
+}
+
+/** Parse bullet-style compatibility lines, e.g. "Nissan Navara D40 (YD25 engine)". */
+function parseCompatibilityVehicleLine(line: string): {
+  make: string;
+  model: string;
+  engine_code: string | null;
+} | null {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^(compatible with|fits|for fitment|important notes|injectors)\b/i.test(trimmed)) {
+    return null;
+  }
+
+  if (/contact|visit|call us|enquire|confirm fitment/i.test(trimmed)) {
+    return null;
+  }
+
+  const parenEngineMatch = trimmed.match(
+    /^([A-Za-z][A-Za-z\s-]*?)\s+(.+?)\s+\(([A-Z0-9][A-Z0-9-]*)\s+engine\)$/i,
+  );
+  if (parenEngineMatch) {
+    return {
+      make: parenEngineMatch[1].trim(),
+      model: parenEngineMatch[2].trim(),
+      engine_code: parenEngineMatch[3].trim(),
+    };
+  }
+
+  const withEngineMatch = trimmed.match(
+    /^([A-Za-z][A-Za-z\s-]*?)\s+(.+?)\s+with\s+([A-Z0-9][A-Z0-9-]*)\s+engine$/i,
+  );
+  if (withEngineMatch) {
+    return {
+      make: withEngineMatch[1].trim(),
+      model: withEngineMatch[2].trim(),
+      engine_code: withEngineMatch[3].trim(),
+    };
+  }
+
+  return null;
+}
+
+function mergeCompatibilityVehicleLine(
+  fitment: NormalizedFitment,
+  entry: { make: string; model: string; engine_code: string | null },
+): void {
+  fitment.makes = mergeUniqueValues(fitment.makes, [entry.make]);
+  fitment.models = mergeUniqueValues(fitment.models, [entry.model]);
+  if (entry.engine_code) {
+    fitment.engine_codes = mergeUniqueValues(fitment.engine_codes, [entry.engine_code]);
+  }
+}
+
 export function parseFitmentDeterministic(raw: string): FitmentParseResult {
-  const trimmed = raw.trim();
+  const trimmed = fitmentRawToPlainText(raw).trim();
 
   if (!trimmed) {
     return {
@@ -130,9 +218,9 @@ export function parseFitmentDeterministic(raw: string): FitmentParseResult {
       const value = line.slice(colonIndex + 1).trim();
 
       sawStructuredField = true;
-      inYearRangeSection = key === "year range";
+      inYearRangeSection = key === "year range" || key === "model years";
 
-      if (!value && key !== "year range") {
+      if (!value && key !== "year range" && key !== "model years") {
         unparsedLines.push(line);
         continue;
       }
@@ -145,12 +233,11 @@ export function parseFitmentDeterministic(raw: string): FitmentParseResult {
         case "model":
           fitment.models = splitListValue(value);
           break;
-        case "engine code": {
-          const { code, note } = extractEngineCode(value);
-          if (code) {
-            fitment.engine_codes = [code];
-          }
-          fitment.notes = appendNote(fitment.notes, note);
+        case "engine code":
+        case "engine codes":
+        case "engine type":
+        case "engine": {
+          assignEngineCodes(fitment, value);
           break;
         }
         case "fuel type":
@@ -160,6 +247,7 @@ export function parseFitmentDeterministic(raw: string): FitmentParseResult {
           fitment.fuel_system = value;
           break;
         case "year range":
+        case "model years":
           if (value) {
             const inlineRange = parseYearRangeLine(`Vehicle: ${value}`);
             if (inlineRange) {
@@ -184,6 +272,13 @@ export function parseFitmentDeterministic(raw: string): FitmentParseResult {
         inYearRangeSection = true;
         continue;
       }
+    }
+
+    const compatibilityEntry = parseCompatibilityVehicleLine(line);
+    if (compatibilityEntry) {
+      mergeCompatibilityVehicleLine(fitment, compatibilityEntry);
+      sawStructuredField = true;
+      continue;
     }
 
     unparsedLines.push(line);

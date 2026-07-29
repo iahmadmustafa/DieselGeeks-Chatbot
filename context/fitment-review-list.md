@@ -1,7 +1,7 @@
 # Fitment review list (vehicle parts only)
 
 **Site:** [stage2.dieselgeeks.com.au](https://stage2.dieselgeeks.com.au)  
-**Generated from:** Redis catalog snapshot (2026-07-07T11:25:29.691Z)  
+**Generated from:** Redis catalog snapshot (2026-07-26T20:02:01.357Z)  
 **Total products in catalog:** 75  
 **Products needing fitment attention:** 17  
 

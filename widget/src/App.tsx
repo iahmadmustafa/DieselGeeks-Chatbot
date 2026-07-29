@@ -2,6 +2,7 @@ import * as React from "react";
 
 import { ChatWidget } from "./components/ChatWidget";
 import { BrandLogo } from "./components/BrandLogo";
+import { CartToast } from "./components/CartToast";
 
 function useIsMobile(breakpoint = 640): boolean {
   const [isMobile, setIsMobile] = React.useState(
@@ -39,6 +40,7 @@ export function App({ apiBase }: { apiBase: string }) {
 
   return (
     <div className="dg-root">
+      <CartToast />
       <button
         type="button"
         className="dg-launcher"

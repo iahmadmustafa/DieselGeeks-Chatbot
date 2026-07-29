@@ -4,6 +4,7 @@ import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
 
 import { getOrCreateSessionId } from "../session";
+import { loadStoredConversation, saveStoredConversation } from "../conversation-storage";
 import type { ChatUIMessage, ProductCard } from "../types";
 import { ProductCardView } from "./ProductCard";
 import { BrandLogo } from "./BrandLogo";
@@ -75,6 +76,7 @@ interface ChatWidgetProps {
 
 export function ChatWidget({ apiBase, logoUrl, isOpen, isMobile, onClose }: ChatWidgetProps) {
   const sessionId = useMemo(() => getOrCreateSessionId(), []);
+  const restoredMessages = useMemo(() => loadStoredConversation(sessionId), [sessionId]);
   const transport = useMemo(
     () =>
       new DefaultChatTransport<ChatUIMessage>({
@@ -86,7 +88,9 @@ export function ChatWidget({ apiBase, logoUrl, isOpen, isMobile, onClose }: Chat
   );
 
   const { messages, sendMessage, status, error, stop } = useChat<ChatUIMessage>({
+    id: sessionId,
     transport,
+    messages: restoredMessages,
   });
 
   const [input, setInput] = React.useState("");
@@ -96,6 +100,20 @@ export function ChatWidget({ apiBase, logoUrl, isOpen, isMobile, onClose }: Chat
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, status]);
+
+  React.useEffect(() => {
+    if (status === "submitted" || status === "streaming") {
+      return;
+    }
+
+    saveStoredConversation(sessionId, messages);
+  }, [sessionId, messages, status]);
+
+  React.useEffect(() => {
+    return () => {
+      saveStoredConversation(sessionId, messages);
+    };
+  }, [sessionId, messages]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -108,14 +126,17 @@ export function ChatWidget({ apiBase, logoUrl, isOpen, isMobile, onClose }: Chat
     await sendMessage({ text: trimmed.slice(0, MAX_MESSAGE_LENGTH) });
   }
 
-  if (!isOpen) {
-    return null;
-  }
-
   const panelClass = isMobile ? "dg-panel dg-panel-mobile" : "dg-panel dg-panel-desktop";
+  const panelStateClass = isOpen ? "" : " dg-panel-hidden";
 
   return (
-    <section className={panelClass} role="dialog" aria-label="Dr Diesel assistant">
+    <section
+      className={`${panelClass}${panelStateClass}`}
+      role="dialog"
+      aria-label="Dr Diesel assistant"
+      aria-hidden={!isOpen}
+      hidden={!isOpen}
+    >
       <header className="dg-header">
         <div className="dg-header-brand">
           <div className="dg-header-logo">

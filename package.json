@@ -14,7 +14,8 @@
     "dump-fitment": "tsx scripts/dump-fitment.ts",
     "clear-fitment-cache": "tsx scripts/clear-fitment-parse-cache.ts",
     "analyze-parse-failures": "tsx scripts/analyze-parse-failures.ts",
-    "generate-fitment-review-list": "tsx scripts/generate-fitment-review-list.ts"
+    "generate-fitment-review-list": "tsx scripts/generate-fitment-review-list.ts",
+    "generate-fitment-audit-sheet": "tsx scripts/generate-fitment-audit-sheet.ts"
   },
   "repository": {
     "type": "git",
@@ -36,8 +37,10 @@
     "@types/node": "^26.1.0",
     "@types/react": "^19.2.17",
     "esbuild": "^0.28.1",
+    "exceljs": "^4.4.0",
     "tsx": "^4.23.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "xlsx": "^0.18.5"
   }
 }

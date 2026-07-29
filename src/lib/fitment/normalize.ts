@@ -17,7 +17,7 @@ import {
   createEmptyNormalizedFitment,
   isUnstructuredFitmentMessage,
 } from "@/lib/fitment/unstructured";
-import { stripHtml } from "@/lib/text/strip-html";
+import { fitmentRawToPlainText } from "@/lib/text/strip-html";
 
 // OpenAI strict structured output: every property must be required; use nullable, not optional/default.
 const yearRangeEntrySchema = z.object({
@@ -146,7 +146,7 @@ export async function parseFitmentWithLlm(raw: string): Promise<FitmentParseResu
   const openai = createOpenAI({ apiKey });
   const model = getFitmentLlmModel();
   const reasoningEffort = getFitmentLlmReasoningEffort();
-  const llmInput = stripHtml(raw);
+  const llmInput = fitmentRawToPlainText(raw);
 
   try {
     const { object, usage } = await generateObject({

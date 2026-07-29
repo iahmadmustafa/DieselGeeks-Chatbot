@@ -1,4 +1,5 @@
 import type { NormalizedFitment } from "@/types/catalog";
+import { fitmentRawToPlainText } from "@/lib/text/strip-html";
 
 export function createEmptyNormalizedFitment(notes: string | null = null): NormalizedFitment {
   return {
@@ -19,8 +20,9 @@ export function isUnstructuredFitmentMessage(raw: string): boolean {
     return true;
   }
 
-  const hasStructuredKeys = /^(make|models?|engine code|fuel type|fuel system|year range):/im.test(
-    trimmed,
+  const plainText = fitmentRawToPlainText(trimmed);
+  const hasStructuredKeys = /^(make|models?|engine codes?|engine type|engine|fuel type|fuel system|year range|model years):/im.test(
+    plainText,
   );
   if (hasStructuredKeys) {
     return false;

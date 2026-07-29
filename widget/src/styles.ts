@@ -102,6 +102,76 @@ export const WIDGET_CSS = `
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+.dg-panel-hidden {
+  display: none !important;
+}
+
+.dg-cart-toast {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(5.5rem, calc(1rem + env(safe-area-inset-bottom)));
+  z-index: 2147483002;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: min(320px, calc(100vw - 2rem));
+  max-width: min(360px, calc(100vw - 2rem));
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  background: linear-gradient(135deg, #17301f 0%, #111315 100%);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  animation: dg-toast-in 0.22s ease;
+}
+
+.dg-cart-toast-icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.16);
+  color: var(--dg-success);
+  flex-shrink: 0;
+}
+
+.dg-cart-toast-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.dg-cart-toast-copy strong {
+  font-size: 0.82rem;
+  color: var(--dg-text);
+}
+
+.dg-cart-toast-copy span:last-child {
+  font-size: 0.74rem;
+  color: var(--dg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes dg-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dg-product-error {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  color: #fca5a5;
+}
+
 .dg-header {
   display: flex;
   align-items: center;
@@ -372,6 +442,11 @@ export const WIDGET_CSS = `
   background: var(--dg-cta-hover);
 }
 
+.dg-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .dg-btn-secondary {
   background: transparent;
   color: var(--dg-text);
@@ -488,6 +563,14 @@ export const WIDGET_CSS = `
 }
 
 @media (max-width: 640px) {
+  .dg-cart-toast {
+    top: max(1rem, env(safe-area-inset-top));
+    right: 1rem;
+    left: 1rem;
+    bottom: auto;
+    max-width: none;
+  }
+
   .dg-launcher-text {
     display: none;
   }

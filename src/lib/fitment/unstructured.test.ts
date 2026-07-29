@@ -15,6 +15,12 @@ Engine Code: 4JJ1`),
     ).toBe(false);
   });
 
+  it("does not skip HTML list fitment text", () => {
+    expect(
+      isUnstructuredFitmentMessage(`<ul><li><strong>Make:</strong> Toyota</li></ul>`),
+    ).toBe(false);
+  });
+
   it("treats empty fitment as unstructured", () => {
     expect(isUnstructuredFitmentMessage("   ")).toBe(true);
   });

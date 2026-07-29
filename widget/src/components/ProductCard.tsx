@@ -1,3 +1,6 @@
+import * as React from "react";
+
+import { addProductToCart, notifyCartAdded } from "../add-to-cart";
 import type { ProductCard } from "../types";
 
 function formatPrice(price: string): string {
@@ -27,7 +30,30 @@ function stockLabel(status: string): { label: string; className: string } {
 
 export function ProductCardView({ product }: { product: ProductCard }) {
   const stock = stockLabel(product.stock_status);
-  const addToCartUrl = `${product.permalink}${product.permalink.includes("?") ? "&" : "?"}add-to-cart=${product.id}`;
+  const [isAdding, setIsAdding] = React.useState(false);
+  const [addError, setAddError] = React.useState<string | null>(null);
+
+  async function handleAddToCart(): Promise<void> {
+    if (isAdding) {
+      return;
+    }
+
+    setAddError(null);
+    setIsAdding(true);
+
+    const result = await addProductToCart(product.id);
+    setIsAdding(false);
+
+    if (!result.ok) {
+      setAddError(result.error ?? "Could not add item to cart.");
+      return;
+    }
+
+    notifyCartAdded({
+      productId: product.id,
+      productTitle: product.title,
+    });
+  }
 
   return (
     <article className="dg-product-card">
@@ -59,11 +85,17 @@ export function ProductCardView({ product }: { product: ProductCard }) {
             View product
           </a>
           {product.stock_status === "instock" ? (
-            <a className="dg-btn dg-btn-primary" href={addToCartUrl} target="_blank" rel="noopener noreferrer">
-              Add to cart
-            </a>
+            <button
+              type="button"
+              className="dg-btn dg-btn-primary"
+              onClick={() => void handleAddToCart()}
+              disabled={isAdding}
+            >
+              {isAdding ? "Adding..." : "Add to cart"}
+            </button>
           ) : null}
         </div>
+        {addError ? <p className="dg-product-error">{addError}</p> : null}
       </div>
     </article>
   );
