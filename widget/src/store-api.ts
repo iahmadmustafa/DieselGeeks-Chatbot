@@ -135,9 +135,21 @@ export interface StoreApiCart {
 
 export type StoreApiCartResult = { ok: true; cart: StoreApiCart } | { ok: false; error: string };
 
-export interface StoreApiPaymentDataEntry {
+/** An entry the server echoes back in `payment_details` — always a string. */
+export interface StoreApiPaymentDetailEntry {
   key: string;
   value: string;
+}
+
+/**
+ * An entry we send in the outgoing `payment_data` array. WooCommerce's own
+ * confirmed example for the Stripe gateway's deferred-intent flow mixes
+ * string and native boolean values (e.g. `"wc-stripe-new-payment-method":
+ * true`), so this is intentionally looser than the response-side type.
+ */
+export interface StoreApiPaymentDataEntry {
+  key: string;
+  value: string | boolean;
 }
 
 /**
@@ -151,7 +163,7 @@ export interface StoreApiPaymentDataEntry {
  */
 export interface StoreApiPaymentResult {
   payment_status: string;
-  payment_details: StoreApiPaymentDataEntry[];
+  payment_details: StoreApiPaymentDetailEntry[];
   redirect_url?: string;
 }
 
@@ -167,7 +179,7 @@ export type StoreApiCheckoutResult =
   | { ok: false; error: string };
 
 /** Reads a single value out of a Store API `payment_details`-shaped array. */
-export function readPaymentDetail(details: StoreApiPaymentDataEntry[] | undefined, key: string): string | null {
+export function readPaymentDetail(details: StoreApiPaymentDetailEntry[] | undefined, key: string): string | null {
   const entry = details?.find((item) => item.key === key);
   return entry ? entry.value : null;
 }

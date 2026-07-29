@@ -8,6 +8,7 @@ import {
   type StoreApiAddress,
   type StoreApiCart,
   type StoreApiOrder,
+  type StoreApiPaymentDataEntry,
 } from "../store-api";
 import { useStripeCardElement } from "../stripe-client";
 
@@ -42,6 +43,34 @@ function splitName(fullName: string): { first_name: string; last_name: string } 
 
 function addressFromShipping(shipping: StoreApiAddress, email: string, fullName: string): StoreApiAddress {
   return { ...shipping, ...splitName(fullName), email };
+}
+
+/**
+ * Builds the full `payment_data` the Stripe gateway's Store API integration
+ * expects for its modern "deferred intent" flow (confirmed directly by a
+ * WooCommerce engineer: https://github.com/woocommerce/woocommerce/issues/50678#issuecomment-2343957702).
+ *
+ * We originally sent only `wc-stripe-payment-method`, which isn't enough on
+ * its own — without `wc-stripe-new-payment-method` / `wc-stripe-is-deferred-intent`
+ * telling the gateway this is a brand-new card (not a saved token lookup),
+ * it silently fell back to an empty payment method internally. Confirmed via
+ * the site's own Stripe gateway debug log: it logged a "prepared source"
+ * object with every field — `token_id`, `source`, `payment_method` — empty,
+ * which is exactly what produced the generic "Payment processing failed"
+ * error despite a valid `pm_...` ID having been created client-side.
+ */
+function buildStripePaymentData(paymentMethodId: string, billingAddress: StoreApiAddress): StoreApiPaymentDataEntry[] {
+  return [
+    { key: "wc-stripe-payment-method", value: paymentMethodId },
+    { key: "billing_email", value: billingAddress.email ?? "" },
+    { key: "billing_first_name", value: billingAddress.first_name },
+    { key: "billing_last_name", value: billingAddress.last_name },
+    { key: "payment_method", value: "stripe" },
+    { key: "paymentRequestType", value: "cc" },
+    { key: "wc-stripe-new-payment-method", value: true },
+    { key: "wc-stripe-is-deferred-intent", value: true },
+    { key: "save_payment_method", value: "no" },
+  ];
 }
 
 type PaymentStatus = "idle" | "submitting" | "confirming" | "error";
@@ -148,7 +177,7 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
       billing_address: billingAddress,
       shipping_address: shippingAddress,
       payment_method: "stripe",
-      payment_data: [{ key: "wc-stripe-payment-method", value: paymentMethodResult.paymentMethodId }],
+      payment_data: buildStripePaymentData(paymentMethodResult.paymentMethodId, billingAddress),
     });
 
     if (!checkoutResult.ok) {
@@ -189,7 +218,7 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
         billing_address: billingAddress,
         shipping_address: shippingAddress,
         payment_method: "stripe",
-        payment_data: [{ key: "wc-stripe-payment-method", value: paymentMethodResult.paymentMethodId }],
+        payment_data: buildStripePaymentData(paymentMethodResult.paymentMethodId, billingAddress),
       });
 
       if (!finalizeResult.ok) {
