@@ -42,6 +42,7 @@ export const WIDGET_CSS = `
   --dg-dur-fast: 130ms;
   --dg-dur-base: 220ms;
   --dg-dur-slow: 320ms;
+  --dg-mobile-bottom-offset: 0px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
   color: var(--dg-text);
   line-height: 1.5;
@@ -238,7 +239,7 @@ export const WIDGET_CSS = `
   height: 100%;
   border-radius: 0;
   padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: calc(var(--dg-mobile-bottom-offset) + env(safe-area-inset-bottom));
   transform-origin: bottom center;
 }
 
@@ -1054,6 +1055,7 @@ export const WIDGET_CSS = `
     padding: 0.5rem;
     justify-content: center;
     border-radius: var(--dg-radius-xl);
+    bottom: calc(var(--dg-mobile-bottom-offset) + max(1.1rem, env(safe-area-inset-bottom)));
   }
 
   .dg-launcher-icon-wrap {

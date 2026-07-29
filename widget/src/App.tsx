@@ -3,6 +3,11 @@ import * as React from "react";
 import { ChatWidget } from "./components/ChatWidget";
 import { BrandLogo } from "./components/BrandLogo";
 import { CartToast } from "./components/CartToast";
+import { resolveMobileBottomOffsetPx } from "./config";
+
+interface RootCSSVars extends React.CSSProperties {
+  "--dg-mobile-bottom-offset"?: string;
+}
 
 function useIsMobile(breakpoint = 640): boolean {
   const [isMobile, setIsMobile] = React.useState(
@@ -24,6 +29,8 @@ export function App({ apiBase }: { apiBase: string }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const isMobile = useIsMobile();
   const logoUrl = `${apiBase}/dr-diesel-logo.png`;
+  const mobileBottomOffsetPx = React.useMemo(() => resolveMobileBottomOffsetPx(), []);
+  const rootStyle: RootCSSVars = { "--dg-mobile-bottom-offset": `${mobileBottomOffsetPx}px` };
 
   React.useEffect(() => {
     if (!isOpen || !isMobile) {
@@ -39,7 +46,7 @@ export function App({ apiBase }: { apiBase: string }) {
   }, [isOpen, isMobile]);
 
   return (
-    <div className="dg-root">
+    <div className="dg-root" style={rootStyle}>
       <CartToast isChatOpen={isOpen} />
       <button
         type="button"
