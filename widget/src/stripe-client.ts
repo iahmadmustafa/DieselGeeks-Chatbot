@@ -103,6 +103,14 @@ export function useStripeCardElement(): StripeCardElementState {
 
         const elements = stripe.elements();
         const card = elements.create("card", {
+          // Stripe's Card Element includes a postal-code sub-field by
+          // default, which stayed invisible in our compact, fixed-height
+          // iframe layout but still counted toward "complete" — silently
+          // keeping the card permanently incomplete (and the Pay button
+          // disabled) no matter what the shopper typed. We already collect
+          // the full billing address separately (reused from the shipping
+          // step), so this field is redundant — disable it outright.
+          hidePostalCode: true,
           // The widget is dark-themed (see design tokens in styles.ts) —
           // Stripe's Card Element defaults to black text, which is invisible
           // against our dark surface unless explicitly overridden here.
