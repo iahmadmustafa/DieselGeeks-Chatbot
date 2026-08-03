@@ -10,6 +10,8 @@ const rootDir = resolve(__dirname, "..");
 const outfile = resolve(rootDir, "public", "dieselgeeks-chat.js");
 const logoSource = resolve(__dirname, "src", "assets", "logo.png");
 const logoOutput = resolve(rootDir, "public", "dr-diesel-logo.png");
+const heroBgSource = resolve(rootDir, "src", "assests", "background.png");
+const heroBgOutput = resolve(rootDir, "public", "dg-hero-bg.png");
 
 async function fileExists(path) {
   try {
@@ -111,8 +113,37 @@ async function prepareLogo() {
   );
 }
 
+/**
+ * Photo behind HeroChat's idle/expanded views (see styles.ts .dg-hero). Just
+ * a straight copy into public/ — unlike the logo there's no fixed target
+ * size (it's a full-bleed cover image at whatever the hero section's
+ * dimensions end up being), so no resize step. Missing source/output is
+ * non-fatal: HeroChat degrades to its CSS-only gradient background.
+ */
+async function prepareHeroBackground() {
+  await mkdir(dirname(heroBgOutput), { recursive: true });
+
+  const hasSource = await fileExists(heroBgSource);
+  if (!hasSource) {
+    const hasOutput = await fileExists(heroBgOutput);
+    if (hasOutput) {
+      console.log(`[build:widget] Hero background source missing; using committed ${heroBgOutput}`);
+    } else {
+      console.warn(
+        `[build:widget] No hero background found at ${heroBgSource}; HeroChat will use its CSS gradient only.`,
+      );
+    }
+    return;
+  }
+
+  await copyFile(heroBgSource, heroBgOutput);
+  const outputStat = await stat(heroBgOutput);
+  console.log(`[build:widget] Hero background copied -> ${heroBgOutput} (${outputStat.size} bytes)`);
+}
+
 await mkdir(dirname(outfile), { recursive: true });
 await prepareLogo();
+await prepareHeroBackground();
 
 await esbuild.build({
   entryPoints: [resolve(__dirname, "src", "index.tsx")],

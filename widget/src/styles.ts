@@ -763,6 +763,7 @@ export const WIDGET_CSS = `
   background: var(--dg-surface);
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 0.5rem;
 }
 
@@ -915,13 +916,20 @@ export const WIDGET_CSS = `
   max-width: 26rem;
 }
 
+/*
+ * Was width: 100% — stretched into a very wide but still ~2.15rem-tall
+ * bar (the .dg-btn default height), which read as an oddly thin banner
+ * rather than a normal button. A compact, centered secondary button matches
+ * every other button in the cart view instead of visually dominating it.
+ */
 .dg-cart-checkout-link {
-  width: 100%;
+  width: auto;
 }
 
 .dg-cart-view-note {
   margin: 0;
   font-size: 0.68rem;
+  text-align: center;
   color: var(--dg-muted);
   line-height: 1.4;
   text-align: center;
@@ -941,7 +949,14 @@ export const WIDGET_CSS = `
     radial-gradient(circle at 100% 0%, rgba(101, 210, 213, 0.09), transparent 45%),
     radial-gradient(circle at 0% 100%, rgba(101, 210, 213, 0.05), transparent 50%),
     var(--dg-bg);
-  scroll-behavior: smooth;
+  /*
+   * No scroll-behavior: smooth here on purpose. scrollIntoView({ behavior:
+   * "auto" }) in ChatThread.tsx still respects this CSS property, so leaving
+   * it "smooth" would keep animating (and re-queuing/colliding) every one of
+   * the many auto-scrolls fired per second while a reply streams in — the
+   * exact "vibrating" jitter that behavior: "auto" is meant to eliminate.
+   */
+  scroll-behavior: auto;
 }
 
 .dg-messages::-webkit-scrollbar {
@@ -1513,6 +1528,21 @@ export const WIDGET_CSS = `
   cursor: not-allowed;
 }
 
+/*
+ * Swaps into the send button's exact slot while a response streams (see
+ * ChatThread.tsx) instead of the old full-width "Stop response" button below
+ * the composer — same small square footprint as send, just a stop icon and
+ * a danger tint so it doesn't read as another send action.
+ */
+.dg-stop-btn {
+  background: var(--dg-danger-soft);
+  color: var(--dg-danger);
+}
+
+.dg-stop-btn:hover {
+  background: rgba(248, 113, 113, 0.24);
+}
+
 .dg-disclaimer {
   margin: 0;
   font-size: 0.68rem;
@@ -1594,6 +1624,334 @@ export const WIDGET_CSS = `
   to { opacity: 0; transform: translateY(8px) scale(0.97); }
 }
 
+/* ---------- Hero (homepage inline chat) ---------- */
+
+/*
+ * Mounted in place of the old front-page slider (see index.tsx / HeroChat.tsx).
+ * Unlike the floating corner panel, this fills whatever box Elementor gives
+ * it — bounded to a fixed height so an expanding conversation scrolls inside
+ * itself instead of growing the page, per the "only in that section" brief.
+ *
+ * The actual photo (public/dg-hero-bg.png, built from src/assests/background.png)
+ * is set as an inline style from HeroChat.tsx, since it needs the per-site
+ * apiBase to build its URL — this file only supplies the dark fallback color
+ * (shown before the photo loads / if it's ever missing) plus the ::before
+ * color-wash + edge vignette that sits on top of the photo for legibility.
+ */
+.dg-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  /*
+   * Must be a hard, definite height — not min-height, and not 100% unless
+   * every ancestor up the chain also has a definite height (which an
+   * Elementor container usually doesn't unless a fixed height is explicitly
+   * set, only "min-height: 100vh" or similar). Get either of those wrong and
+   * flexbox no longer has a real height to divide up: .dg-messages's own
+   * flex: 1; overflow-y: auto can't compute a bounded box to scroll inside,
+   * so instead of scrolling internally the whole section (and the page
+   * under it) just kept growing taller with every message — the composer
+   * visibly sliding further down the page instead of staying pinned. A
+   * fixed height here guarantees a real internal scroll area no matter what
+   * wraps it.
+   */
+  height: min(88vh, 820px);
+  overflow: hidden;
+  color: var(--dg-text);
+  background-color: #05070a;
+}
+
+/*
+ * No dimming/tint in the idle state — the photo shows at full brightness
+ * (headline/subtitle already carry their own text-shadow for legibility).
+ * The darkening wash only kicks in once a conversation starts, via
+ * .dg-hero-active::before below, since that's when a full column of message
+ * text needs to sit on top of the photo and stay readable.
+ */
+.dg-hero-active::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /*
+   * Overall dark wash for message text legibility, a brand-color
+   * (teal/amber) tint tying the photo to the rest of the widget, and a
+   * left/right vignette, all layered here so it paints as one pass, below
+   * the real expanded content.
+   */
+  background: linear-gradient(180deg, rgba(4, 6, 9, 0.32) 0%, rgba(5, 7, 10, 0.52) 45%, rgba(8, 6, 4, 0.72) 100%),
+    radial-gradient(ellipse 65% 60% at 12% 16%, rgba(101, 210, 213, 0.16), transparent 62%),
+    radial-gradient(ellipse 65% 60% at 88% 12%, rgba(101, 210, 213, 0.12), transparent 62%),
+    radial-gradient(ellipse 90% 55% at 50% 78%, rgba(255, 159, 87, 0.2), transparent 68%),
+    radial-gradient(ellipse 58% 95% at 2% 55%, rgba(0, 0, 0, 0.45), transparent 72%),
+    radial-gradient(ellipse 58% 95% at 98% 55%, rgba(0, 0, 0, 0.45), transparent 72%);
+}
+
+.dg-hero-idle {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 1.15rem;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+}
+
+.dg-hero-idle-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1.5px solid rgba(101, 210, 213, 0.45);
+  box-shadow: 0 0 0 6px rgba(101, 210, 213, 0.1);
+}
+
+.dg-hero-idle-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.dg-hero-idle-title {
+  margin: 0;
+  font-size: clamp(1.75rem, 4.2vw, 3rem);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5);
+}
+
+.dg-hero-idle-title span {
+  color: var(--dg-accent);
+}
+
+.dg-hero-idle-subtitle {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--dg-text-secondary);
+  max-width: 34rem;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
+}
+
+.dg-hero-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  max-width: 34rem;
+  padding: 0.45rem 0.45rem 0.45rem 1.1rem;
+  border-radius: var(--dg-radius-full);
+  background: rgba(13, 16, 19, 0.82);
+  border: 1px solid var(--dg-border-strong);
+  box-shadow: var(--dg-shadow-md);
+  backdrop-filter: blur(10px);
+}
+
+.dg-hero-input-row:focus-within {
+  border-color: var(--dg-accent);
+  box-shadow: var(--dg-shadow-md), 0 0 0 3px var(--dg-accent-soft), 0 0 26px var(--dg-accent-glow);
+}
+
+.dg-hero-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--dg-text);
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0.55rem 0;
+}
+
+.dg-hero-input::placeholder {
+  color: var(--dg-muted);
+}
+
+/*
+ * Overrides the generic .dg-root :focus-visible rule (a hard rectangular
+ * outline, fine for most controls but visually jarring on this pill-shaped
+ * input). .dg-hero-input-row:focus-within above already supplies an
+ * intentional glow, so the input itself just needs its outline suppressed.
+ */
+.dg-hero-input:focus,
+.dg-hero-input:focus-visible {
+  outline: none;
+}
+
+.dg-hero-send {
+  flex-shrink: 0;
+}
+
+.dg-hero-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.dg-hero-pill {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(13, 16, 19, 0.55);
+  color: var(--dg-text-secondary);
+  border-radius: var(--dg-radius-full);
+  padding: 0.5rem 0.95rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: border-color var(--dg-dur-fast) ease, color var(--dg-dur-fast) ease, background var(--dg-dur-fast) ease,
+    transform var(--dg-dur-fast) ease, box-shadow var(--dg-dur-fast) ease;
+}
+
+.dg-hero-pill:hover {
+  border-color: var(--dg-accent);
+  color: var(--dg-accent-light);
+  background: rgba(101, 210, 213, 0.1);
+  transform: translateY(-1px);
+}
+
+.dg-hero-pill:focus-visible {
+  outline: none;
+  border-color: var(--dg-accent);
+  box-shadow: 0 0 0 3px var(--dg-accent-soft);
+}
+
+.dg-hero-pill-active {
+  border-color: var(--dg-accent);
+  color: #06282a;
+  background: var(--dg-accent);
+  box-shadow: 0 0 18px var(--dg-accent-glow);
+}
+
+.dg-hero-pill-active:hover {
+  color: #06282a;
+  background: var(--dg-accent);
+}
+
+/*
+ * Rendered as a direct child of .dg-hero (not the idle/expanded boxes,
+ * which only wrap their own centered content) so it always sits inset from
+ * the true top-right corner of the whole section — in both idle and
+ * expanded states — instead of pinning to the top of whatever small content
+ * box happens to be showing. z-index above the idle/expanded panels (both
+ * z-index: 1) since it's rendered before them in source order and would
+ * otherwise paint underneath.
+ */
+.dg-hero-cart-btn {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  z-index: 2;
+  background: rgba(13, 16, 19, 0.65);
+  border-color: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(6px);
+}
+
+.dg-hero-cart-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--dg-accent-soft);
+}
+
+/*
+ * Full-bleed takeover of the hero box once a conversation starts — fills
+ * 100% of .dg-hero's width/height edge to edge (no floating inset card,
+ * no visible margins around it). Its own layers (messages/composer,
+ * overridden below) stay translucent over .dg-hero's background instead of
+ * painting flat opaque black over it, so the same gradient/glow shows
+ * through — dimmed just enough to keep message text readable.
+ */
+.dg-hero-expanded {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: rgba(6, 8, 11, 0.4);
+  backdrop-filter: blur(6px);
+  animation: dg-hero-expand var(--dg-dur-slow) var(--dg-ease-out);
+}
+
+@keyframes dg-hero-expand {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*
+ * These normally paint an opaque background (right for the floating corner
+ * panel); inside the hero's full-bleed takeover they're kept translucent so
+ * .dg-hero's gradient/glow stays visible behind the conversation. Width is
+ * capped and centered — full-bleed refers to the panel/background, not the
+ * message line length, which would otherwise stretch edge-to-edge on a wide
+ * screen with barely any breathing room from the left/right edges.
+ */
+.dg-hero-expanded .dg-messages {
+  background: transparent;
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  padding-top: 3.5rem;
+}
+
+.dg-hero-expanded .dg-cart-view {
+  background: transparent;
+}
+
+/*
+ * Centering this at a capped width (see .dg-messages above) turns it into a
+ * free-floating card in the middle of the hero rather than a bar flush
+ * against a container edge, so — unlike the corner panel's composer, which
+ * is flush against that panel's own rounded shell — it needs its own
+ * rounded corners, border and shadow or the hard rectangular edges look like
+ * a stray, unstyled box sitting on top of the background photo.
+ */
+.dg-hero-expanded .dg-composer {
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto 1.25rem;
+  border-radius: var(--dg-radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(18, 21, 26, 0.68);
+  box-shadow: var(--dg-shadow-md);
+  backdrop-filter: blur(14px);
+}
+
+/*
+ * The plain .dg-input textarea normally carries its own grey border + solid
+ * fill (right for the floating corner panel), but nested inside this
+ * already-bordered rounded card that reads as an ugly "box within a box".
+ * Strip its border/fill so only the card's own rounded edge is visible —
+ * same treatment the idle-state pill input already gets.
+ */
+.dg-hero-expanded .dg-input {
+  border-color: transparent;
+  background: transparent;
+}
+
+.dg-hero-expanded .dg-input:focus {
+  border-color: transparent;
+  box-shadow: none;
+}
+
 /* ---------- Mobile ---------- */
 
 @media (max-width: 640px) {
@@ -1642,6 +2000,20 @@ export const WIDGET_CSS = `
   .dg-btn,
   .dg-chip {
     min-height: 2.75rem;
+  }
+
+  .dg-hero {
+    height: min(90vh, 640px);
+  }
+
+  .dg-hero-idle {
+    padding: 1.5rem 1rem;
+    gap: 0.9rem;
+  }
+
+  .dg-hero-cart-btn {
+    top: -0.4rem;
+    right: -0.2rem;
   }
 }
 

@@ -16,6 +16,9 @@ export default function Home() {
         <li>
           <code>/widget-demo</code> — local embed demo for the storefront widget
         </li>
+        <li>
+          <code>/hero-demo</code> — local demo for the homepage hero chat interface
+        </li>
       </ul>
     </main>
   );
