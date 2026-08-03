@@ -74,7 +74,9 @@ export function CartReview({
 
   function handleDone(): void {
     setCompletedOrder(null);
-    onRefresh();
+    // Cart refreshes on add-to-cart, opening the cart view, or manual
+    // refresh — skip an automatic getCart here; a slow post-order empty-cart
+    // fetch was racing with the next add-to-cart and poisoning Cart-Token.
     onBack();
   }
 

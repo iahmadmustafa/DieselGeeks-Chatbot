@@ -282,7 +282,18 @@ function getStoreApiUrl(path: string): string {
  */
 let cachedCartToken: string | null = null;
 
-function captureCartToken(response: Response): void {
+/**
+ * Incremented every time `clearCachedCartToken()` runs. In-flight Store API
+ * responses from *before* that clear must not overwrite the token — a slow
+ * post-order `getCart()` (empty cart) racing with a fresh add-to-cart was
+ * leaving checkout on an empty-cart token while React still showed items.
+ */
+let cartTokenEpoch = 0;
+
+function captureCartToken(response: Response, epochAtRequestStart: number): void {
+  if (epochAtRequestStart !== cartTokenEpoch) {
+    return;
+  }
   const token = response.headers.get("Cart-Token");
   if (token) {
     cachedCartToken = token;
@@ -311,6 +322,7 @@ function captureCartToken(response: Response): void {
  */
 export function clearCachedCartToken(): void {
   cachedCartToken = null;
+  cartTokenEpoch += 1;
 }
 
 interface StoreApiRequestSuccess<T> {
@@ -341,6 +353,7 @@ function extractErrorMessage(data: unknown, status: number): string {
  * `addProductToCart`, so loading/error UI state can't get stuck.
  */
 async function storeApiRequest<T>(path: string, init: RequestInit): Promise<StoreApiRequestResult<T>> {
+  const epochAtRequestStart = cartTokenEpoch;
   let response: Response;
   try {
     const headers = new Headers(init.headers);
@@ -360,7 +373,7 @@ async function storeApiRequest<T>(path: string, init: RequestInit): Promise<Stor
     return { ok: false, error: "Could not connect. Check your connection and try again." };
   }
 
-  captureCartToken(response);
+  captureCartToken(response, epochAtRequestStart);
 
   let data: unknown = null;
   try {
