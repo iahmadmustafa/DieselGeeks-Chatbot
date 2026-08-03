@@ -3,6 +3,7 @@ import * as React from "react";
 import {
   extractStripeConfirmPiRedirect,
   formatStoreApiMoney,
+  getCart,
   submitCheckout,
   verifyStripeIntent,
   type StoreApiAddress,
@@ -141,7 +142,27 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
     setStatus("submitting");
     setErrorMessage(null);
 
-    const billingAddress = addressFromShipping(nameSource, email.trim(), fullName);
+    // Shipping lives on the server cart, but a slow background `getCart()`
+    // (e.g. from opening the cart view) can race with "Calculate shipping"
+    // and clobber React state with an empty `shipping_address` while rates
+    // still show. Re-read from the Store API right before checkout so the
+    // payload always matches what WooCommerce actually has on file.
+    let shippingSource = cart.needs_shipping ? cart.shipping_address : undefined;
+    if (cart.needs_shipping) {
+      const freshCart = await getCart();
+      if (freshCart.ok && freshCart.cart.shipping_address?.address_1?.trim()) {
+        shippingSource = freshCart.cart.shipping_address;
+      }
+    }
+
+    const resolvedNameSource = shippingSource ?? cart.billing_address;
+    if (!resolvedNameSource?.address_1?.trim()) {
+      setStatus("error");
+      setErrorMessage("Please calculate shipping with your full address before paying.");
+      return;
+    }
+
+    const billingAddress = addressFromShipping(resolvedNameSource, email.trim(), fullName);
 
     const paymentMethodResult = await stripeCard.createPaymentMethod({
       name: fullName,
@@ -164,7 +185,7 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
 
     const checkoutResult = await submitCheckout({
       billing_address: billingAddress,
-      shipping_address: shippingAddress,
+      shipping_address: cart.needs_shipping ? billingAddress : undefined,
       payment_method: "stripe",
       payment_data: buildStripePaymentData(paymentMethodResult.paymentMethodId, billingAddress),
     });

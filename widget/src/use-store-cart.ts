@@ -40,6 +40,11 @@ export function useStoreCart(enabled: boolean): StoreCartState {
   const hasLoadedRef = React.useRef(false);
   const requestIdRef = React.useRef(0);
 
+  /** Bumps the load generation so any in-flight `getCart()` cannot overwrite a newer mutation result. */
+  function invalidateInFlightLoads(): void {
+    requestIdRef.current += 1;
+  }
+
   const load = React.useCallback(async () => {
     hasLoadedRef.current = true;
     const requestId = ++requestIdRef.current;
@@ -94,6 +99,7 @@ export function useStoreCart(enabled: boolean): StoreCartState {
       if (!result.ok) {
         return { ok: false, error: result.error };
       }
+      invalidateInFlightLoads();
       setCart(result.cart);
       setStatus("ready");
       return { ok: true };
@@ -107,6 +113,7 @@ export function useStoreCart(enabled: boolean): StoreCartState {
       if (!result.ok) {
         return { ok: false, error: result.error };
       }
+      invalidateInFlightLoads();
       setCart(result.cart);
       setStatus("ready");
       return { ok: true };
@@ -119,6 +126,7 @@ export function useStoreCart(enabled: boolean): StoreCartState {
     if (!result.ok) {
       return { ok: false, error: result.error };
     }
+    invalidateInFlightLoads();
     setCart(result.cart);
     setStatus("ready");
     return { ok: true };
