@@ -418,9 +418,16 @@ export async function updateCustomerAddress(address: {
 
 /** Removes a single line item (by its cart item `key`) and returns the updated cart. */
 export async function removeCartItem(itemKey: string): Promise<StoreApiCartResult> {
-  const result = await storeApiRequest<StoreApiCart>(`/cart/items/${encodeURIComponent(itemKey)}`, {
-    method: "DELETE",
-  });
+  // Use POST /cart/remove-item (returns full cart JSON) instead of DELETE
+  // /cart/items/:key, which succeeds with 204 No Content and an empty body —
+  // our JSON parser treats that as failure even though the item was removed.
+  const result = await storeApiRequest<StoreApiCart>(
+    `/cart/remove-item?key=${encodeURIComponent(itemKey)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    },
+  );
   return toCartResult(result);
 }
 
