@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import { addProductToCart, notifyCartAdded } from "../add-to-cart";
+import { fetchLiveStockStatus, type LiveStockStatus } from "../store-product";
 import type { ProductCard } from "../types";
 import { CartIcon, CheckIcon } from "./Icons";
 
@@ -34,10 +35,26 @@ function stockLabel(status: string): { label: string; className: string } {
 }
 
 export function ProductCardView({ product }: { product: ProductCard }) {
-  const stock = stockLabel(product.stock_status);
+  const [liveStockStatus, setLiveStockStatus] = React.useState<LiveStockStatus | null>(null);
+  const stockStatus = liveStockStatus ?? product.stock_status;
+  const stock = stockLabel(stockStatus);
   const [addState, setAddState] = React.useState<AddState>("idle");
   const [addError, setAddError] = React.useState<string | null>(null);
   const successTimeoutRef = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    void fetchLiveStockStatus(product.id).then((status) => {
+      if (!cancelled && status) {
+        setLiveStockStatus(status);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [product.id]);
 
   React.useEffect(() => {
     return () => {
@@ -114,7 +131,7 @@ export function ProductCardView({ product }: { product: ProductCard }) {
           <a className="dg-btn dg-btn-secondary" href={product.permalink} target="_blank" rel="noopener noreferrer">
             View product
           </a>
-          {product.stock_status === "instock" ? (
+          {stockStatus === "instock" ? (
             <button
               type="button"
               className={`dg-btn ${addState === "added" ? "dg-btn-success" : "dg-btn-primary"}`}
