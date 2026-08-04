@@ -65,7 +65,16 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
 
   const [input, setInput] = React.useState("");
   const [view, setView] = React.useState<"chat" | "cart">("chat");
-  const [started, setStarted] = React.useState(restoredMessages.length > 0);
+  /*
+   * Deliberately always starts collapsed, even when there's restored history
+   * from an earlier visit — every page load (reload, or navigating here from
+   * another page) should land on the idle "ask a question" screen, not
+   * auto-reopen a stale conversation from hours ago. The restored messages
+   * themselves are still loaded into useChat above, so nothing is lost:
+   * clicking the input, a quick-action pill, or sending a new message
+   * expands right back into the full prior conversation.
+   */
+  const [started, setStarted] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const isBusy = status === "submitted" || status === "streaming";
   const isExpanded = started || view === "cart";
@@ -235,7 +244,13 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
             <button
               type="button"
               className="dg-hero-pill dg-hero-pill-active"
-              onClick={() => inputRef.current?.focus()}
+              onClick={() => {
+                // Explicit "open chat" affordance — expands straight into
+                // the conversation view (picking up any restored history)
+                // rather than just focusing the idle input, since typing
+                // isn't the only way someone should be able to get in.
+                setStarted(true);
+              }}
             >
               <ChatBubbleIcon size={14} />
               Chat
