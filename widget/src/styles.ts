@@ -1893,12 +1893,12 @@ export const WIDGET_CSS = `
    * left/right vignette, all layered here so it paints as one pass, below
    * the real expanded content.
    */
-  background: linear-gradient(180deg, rgba(4, 6, 9, 0.32) 0%, rgba(5, 7, 10, 0.52) 45%, rgba(8, 6, 4, 0.72) 100%),
-    radial-gradient(ellipse 65% 60% at 12% 16%, rgba(101, 210, 213, 0.16), transparent 62%),
-    radial-gradient(ellipse 65% 60% at 88% 12%, rgba(101, 210, 213, 0.12), transparent 62%),
-    radial-gradient(ellipse 90% 55% at 50% 78%, rgba(255, 159, 87, 0.2), transparent 68%),
-    radial-gradient(ellipse 58% 95% at 2% 55%, rgba(0, 0, 0, 0.45), transparent 72%),
-    radial-gradient(ellipse 58% 95% at 98% 55%, rgba(0, 0, 0, 0.45), transparent 72%);
+  background: linear-gradient(180deg, rgba(4, 6, 9, 0.16) 0%, rgba(5, 7, 10, 0.28) 45%, rgba(8, 6, 4, 0.42) 100%),
+    radial-gradient(ellipse 65% 60% at 12% 16%, rgba(101, 210, 213, 0.14), transparent 62%),
+    radial-gradient(ellipse 65% 60% at 88% 12%, rgba(101, 210, 213, 0.1), transparent 62%),
+    radial-gradient(ellipse 90% 55% at 50% 78%, rgba(255, 159, 87, 0.14), transparent 68%),
+    radial-gradient(ellipse 58% 95% at 2% 55%, rgba(0, 0, 0, 0.25), transparent 72%),
+    radial-gradient(ellipse 58% 95% at 98% 55%, rgba(0, 0, 0, 0.25), transparent 72%);
 }
 
 .dg-hero-idle {
@@ -2148,8 +2148,8 @@ export const WIDGET_CSS = `
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background: rgba(6, 8, 11, 0.4);
-  backdrop-filter: blur(6px);
+  background: rgba(6, 8, 11, 0.2);
+  backdrop-filter: blur(3px);
   animation: dg-hero-expand var(--dg-dur-slow) var(--dg-ease-out);
 }
 
