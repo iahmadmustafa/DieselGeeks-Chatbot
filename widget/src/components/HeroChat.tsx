@@ -14,6 +14,7 @@ import {
   CartIcon,
   ChatBubbleIcon,
   ClipboardIcon,
+  CloseIcon,
   DotsIcon,
   ToolsIcon,
   TruckIcon,
@@ -84,6 +85,11 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
     };
   }, [sessionId, messages]);
 
+  function closeChat(): void {
+    setStarted(false);
+    setView("chat");
+  }
+
   async function submitText(rawText: string): Promise<void> {
     const trimmed = rawText.trim();
     if (!trimmed || isBusy) {
@@ -131,18 +137,31 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
         instead of pinning to the top of whatever small content box happens
         to be showing.
       */}
-      <button
-        type="button"
-        className="dg-icon-btn dg-cart-btn dg-hero-cart-btn"
-        onClick={openCartView}
-        aria-label="View cart"
-        aria-pressed={view === "cart"}
-      >
-        <CartIcon size={16} />
-        {storeCart.cart && storeCart.cart.items_count > 0 ? (
-          <span className="dg-cart-badge">{storeCart.cart.items_count}</span>
+      <div className="dg-hero-corner-actions">
+        <button
+          type="button"
+          className="dg-icon-btn dg-cart-btn dg-hero-cart-btn"
+          onClick={openCartView}
+          aria-label="View cart"
+          aria-pressed={view === "cart"}
+        >
+          <CartIcon size={16} />
+          {storeCart.cart && storeCart.cart.items_count > 0 ? (
+            <span className="dg-cart-badge">{storeCart.cart.items_count}</span>
+          ) : null}
+        </button>
+
+        {isExpanded ? (
+          <button
+            type="button"
+            className="dg-icon-btn dg-hero-close-btn"
+            onClick={closeChat}
+            aria-label="Close chat"
+          >
+            <CloseIcon size={15} />
+          </button>
         ) : null}
-      </button>
+      </div>
 
       {isExpanded ? (
         <div className="dg-hero-expanded">

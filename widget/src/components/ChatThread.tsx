@@ -93,30 +93,48 @@ export function ChatThread({
     (getMessageText(lastMessage).length > 0 || getProductsFromMessage(lastMessage).length > 0);
   const showTypingIndicator = status === "submitted" || (status === "streaming" && !lastMessageHasContent);
 
+  // Used to tell "user scrolled up" apart from "container grew taller"
+  // (both change scrollTop's relationship to the bottom, but only the
+  // former should ever cancel auto-follow — see handleMessagesScroll).
+  const lastScrollTopRef = React.useRef(0);
+
   function handleMessagesScroll(): void {
     const container = messagesContainerRef.current;
     if (!container) {
       return;
     }
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    shouldAutoScrollRef.current = distanceFromBottom < 96;
+    const scrolledUp = container.scrollTop < lastScrollTopRef.current;
+    lastScrollTopRef.current = container.scrollTop;
+
+    // A deliberate upward scroll should free the view immediately, even by
+    // a few pixels — waiting for a 96px threshold made it feel like every
+    // scroll-up attempt got snapped straight back to the bottom the instant
+    // the next streamed token arrived. Coming back down still uses a
+    // forgiving threshold so re-following doesn't require pixel precision.
+    shouldAutoScrollRef.current = scrolledUp ? distanceFromBottom < 4 : distanceFromBottom < 96;
   }
 
   /*
    * A streamed reply fires this effect on every token — dozens of times a
    * second, and again whenever product cards pop in and shift the layout.
-   * `scrollIntoView({ behavior: "smooth" })` on every one of those queues a
-   * fresh scroll animation before the last one finishes, so the view keeps
-   * getting yanked toward a target that's still moving — that's the
-   * "vibrating" jitter. Jumping straight to position instead (no animation)
-   * still keeps the latest content pinned in view, just without stacking
-   * competing animations against each other.
+   * `scrollIntoView()` looks like the obvious tool here, but it walks up
+   * every scrollable ancestor needed to bring the target into view — inside
+   * the hero widget that includes the *page itself*, so it was fighting the
+   * user for control of the whole site's scrollbar during every response,
+   * not just the message list. Setting `scrollTop` directly only ever
+   * touches this one container.
    */
   React.useEffect(() => {
     if (!shouldAutoScrollRef.current) {
       return;
     }
-    messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+    const container = messagesContainerRef.current;
+    if (!container) {
+      return;
+    }
+    container.scrollTop = container.scrollHeight;
+    lastScrollTopRef.current = container.scrollTop;
   }, [messages, status]);
 
   return (

@@ -130,6 +130,14 @@ export function DotsIcon({ className, size = 14 }: IconProps) {
   );
 }
 
+export function CloseIcon({ className, size = 14 }: IconProps) {
+  return (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function CheckIcon({ className, size = 14 }: IconProps) {
   return (
     <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">

@@ -1848,19 +1848,37 @@ export const WIDGET_CSS = `
  * z-index: 1) since it's rendered before them in source order and would
  * otherwise paint underneath.
  */
-.dg-hero-cart-btn {
+.dg-hero-corner-actions {
   position: absolute;
   top: 0.85rem;
   right: 0.85rem;
   z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.dg-hero-cart-btn,
+.dg-hero-close-btn {
   background: rgba(13, 16, 19, 0.65);
   border-color: rgba(255, 255, 255, 0.16);
   backdrop-filter: blur(6px);
 }
 
-.dg-hero-cart-btn:focus-visible {
+.dg-hero-cart-btn:focus-visible,
+.dg-hero-close-btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--dg-accent-soft);
+}
+
+/*
+ * Only shown once the hero is expanded (see HeroChat.tsx) — closing takes
+ * the user back to the idle "ask a question" screen without losing the
+ * conversation, which resumes right where it left off on the next message.
+ */
+.dg-hero-close-btn:hover {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.35);
 }
 
 /*
