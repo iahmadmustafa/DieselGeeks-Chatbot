@@ -2013,13 +2013,17 @@ ${w}`,p++;break;case"id":u=w.includes("\0")?void 0:w;break;case"retry":/^\d+$/.t
  * Same "live"/pulsing signal-ring treatment as the corner launcher's icon
  * (.dg-launcher-icon-wrap::before + dg-ring-pulse) so the hero's idle icon
  * reads the same way \u2014 an actively listening assistant, not a static logo.
+ * Deliberately no overflow: hidden here \u2014 the ring's inset: -6px puts it
+ * outside this box on purpose, and hiding overflow to clip the image into a
+ * circle would clip the ring away too. The circular clip is done on the
+ * img itself instead (border-radius: 50%), so nothing needs to be hidden
+ * at this level.
  */
 .dg-hero-idle-icon {
   position: relative;
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 50%;
-  overflow: hidden;
   border: 1.5px solid rgba(101, 210, 213, 0.45);
   box-shadow: 0 0 0 6px rgba(101, 210, 213, 0.1);
 }
@@ -2028,7 +2032,7 @@ ${w}`,p++;break;case"id":u=w.includes("\0")?void 0:w;break;case"retry":/^\d+$/.t
   content: "";
   position: absolute;
   inset: -6px;
-  border-radius: inherit;
+  border-radius: 50%;
   border: 1.5px solid var(--dg-accent);
   opacity: 0.55;
   animation: dg-ring-pulse 2.6s ease-out infinite;
@@ -2040,6 +2044,7 @@ ${w}`,p++;break;case"id":u=w.includes("\0")?void 0:w;break;case"retry":/^\d+$/.t
   z-index: 1;
   width: 100%;
   height: 100%;
+  border-radius: 50%;
   object-fit: cover;
   display: block;
 }
