@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 
 import { resolveApiBase } from "../config";
 import type { ProductCard } from "../types";
@@ -26,6 +27,33 @@ export function NotifyRestockModal({ product, onClose }: NotifyRestockModalProps
   const [status, setStatus] = React.useState<SubmitStatus>("idle");
   const [error, setError] = React.useState<string | null>(null);
   const dialogRef = React.useRef<HTMLDivElement | null>(null);
+  const markerRef = React.useRef<HTMLSpanElement | null>(null);
+  const [portalTarget, setPortalTarget] = React.useState<Element | null>(null);
+
+  /*
+   * Product cards render deep inside containers that use backdrop-filter
+   * (.dg-hero-expanded, .dg-panel, cart cards, etc.) — per spec, any
+   * ancestor with a filter/backdrop-filter/transform becomes the
+   * containing block for position: fixed descendants instead of the real
+   * viewport. That's what caused the "moving up and down" glitch: the
+   * modal was fixed to a growing/scrolling chat container, not the
+   * screen. Rendering it via a portal straight onto the shadow root's own
+   * top-level <div class="dg-root"> — a sibling of everything else, with
+   * no filter/transform of its own — makes position: fixed anchor to the
+   * actual viewport again.
+   */
+  React.useEffect(() => {
+    const marker = markerRef.current;
+    if (!marker) {
+      return;
+    }
+    const root = marker.getRootNode();
+    if (root instanceof ShadowRoot) {
+      setPortalTarget(root.querySelector(".dg-root") ?? root.firstElementChild);
+    } else {
+      setPortalTarget(document.body);
+    }
+  }, []);
 
   React.useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
@@ -81,7 +109,7 @@ export function NotifyRestockModal({ product, onClose }: NotifyRestockModalProps
     }
   }
 
-  return (
+  const modal = (
     <div className="dg-modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <div className="dg-modal" role="dialog" aria-modal="true" aria-label="Notify me when back in stock" ref={dialogRef}>
         <button type="button" className="dg-modal-close" onClick={onClose} aria-label="Close">
@@ -168,5 +196,12 @@ export function NotifyRestockModal({ product, onClose }: NotifyRestockModalProps
         )}
       </div>
     </div>
+  );
+
+  return (
+    <>
+      <span ref={markerRef} style={{ display: "none" }} aria-hidden="true" />
+      {portalTarget ? createPortal(modal, portalTarget) : null}
+    </>
   );
 }
