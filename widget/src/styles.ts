@@ -1917,7 +1917,13 @@ export const WIDGET_CSS = `
   padding: 2rem 1.25rem;
 }
 
+/*
+ * Same "live"/pulsing signal-ring treatment as the corner launcher's icon
+ * (.dg-launcher-icon-wrap::before + dg-ring-pulse) so the hero's idle icon
+ * reads the same way — an actively listening assistant, not a static logo.
+ */
 .dg-hero-idle-icon {
+  position: relative;
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 50%;
@@ -1926,7 +1932,20 @@ export const WIDGET_CSS = `
   box-shadow: 0 0 0 6px rgba(101, 210, 213, 0.1);
 }
 
+.dg-hero-idle-icon::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
+  border: 1.5px solid var(--dg-accent);
+  opacity: 0.55;
+  animation: dg-ring-pulse 2.6s ease-out infinite;
+  pointer-events: none;
+}
+
 .dg-hero-idle-icon img {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -1954,21 +1973,34 @@ export const WIDGET_CSS = `
   text-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
 }
 
+/*
+ * Starts a touch smaller/tighter than its "resting" size (see :focus-within
+ * below) and grows into full size the moment it's focused — a small bit of
+ * interactivity that invites a click, rather than just sitting there static.
+ * transform: scale (not just padding) so it visibly "expands" rather than
+ * only nudging its own edges.
+ */
 .dg-hero-input-row {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   width: 100%;
   max-width: 34rem;
-  padding: 0.45rem 0.45rem 0.45rem 1.1rem;
+  padding: 0.4rem 0.4rem 0.4rem 1rem;
   border-radius: var(--dg-radius-full);
   background: rgba(13, 16, 19, 0.82);
   border: 1px solid var(--dg-border-strong);
   box-shadow: var(--dg-shadow-md);
   backdrop-filter: blur(10px);
+  transform: scale(0.96);
+  transform-origin: center;
+  transition: transform var(--dg-dur-slow) var(--dg-ease-spring), padding var(--dg-dur-base) var(--dg-ease-out),
+    border-color var(--dg-dur-fast) ease, box-shadow var(--dg-dur-base) ease;
 }
 
 .dg-hero-input-row:focus-within {
+  transform: scale(1);
+  padding: 0.45rem 0.45rem 0.45rem 1.1rem;
   border-color: var(--dg-accent);
   box-shadow: var(--dg-shadow-md), 0 0 0 3px var(--dg-accent-soft), 0 0 26px var(--dg-accent-glow);
 }
