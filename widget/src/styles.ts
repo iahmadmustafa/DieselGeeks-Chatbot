@@ -2338,9 +2338,25 @@ export const WIDGET_CSS = `
     gap: 0.9rem;
   }
 
-  .dg-hero-cart-btn {
-    top: -0.4rem;
-    right: -0.2rem;
+  /*
+   * The cart + close buttons live in one row (.dg-hero-corner-actions, see
+   * desktop rule above) — this used to individually offset just the cart
+   * button with top/right nudges from back when it was its own
+   * absolutely-positioned element, which left it visibly out of line with
+   * the close button next to it once both moved into a shared flex row.
+   * Sizing both down slightly and giving the row itself safe-area-aware
+   * clearance keeps them aligned as one compact pair on small screens.
+   */
+  .dg-hero-corner-actions {
+    top: max(0.6rem, env(safe-area-inset-top));
+    right: max(0.6rem, env(safe-area-inset-right));
+    gap: 0.35rem;
+  }
+
+  .dg-hero-cart-btn,
+  .dg-hero-close-btn {
+    width: 2.25rem;
+    height: 2.25rem;
   }
 }
 
