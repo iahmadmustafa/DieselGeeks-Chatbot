@@ -2004,7 +2004,66 @@ ${w}`,p++;break;case"id":u=w.includes("\0")?void 0:w;break;case"retry":/^\d+$/.t
   padding-top: 3.5rem;
 }
 
+/*
+ * Letting the cart view stay fully transparent (as messages/composer do)
+ * left every row \u2014 item cards, address inputs, summary \u2014 floating directly
+ * on whatever's behind the hero with no shared surface to unify them, which
+ * read as unstyled plain HTML rather than part of the same interface. Cart
+ * content also skews denser/more form-like than chat bubbles, so instead of
+ * bleeding through it gets its own solid, centered glass panel \u2014 same
+ * frosted-card language as .dg-hero-expanded .dg-composer below.
+ */
 .dg-hero-expanded .dg-cart-view {
+  background: transparent;
+  align-items: center;
+}
+
+.dg-hero-expanded .dg-cart-view-toolbar {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1.1rem 0.5rem 0.75rem;
+  border-bottom: none;
+}
+
+.dg-hero-expanded .dg-cart-view-body {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0 0.5rem 1rem;
+}
+
+.dg-hero-expanded .dg-cart-item,
+.dg-hero-expanded .dg-cart-shipping,
+.dg-hero-expanded .dg-cart-summary,
+.dg-hero-expanded .dg-payment-step {
+  background: rgba(18, 21, 26, 0.72);
+  backdrop-filter: blur(14px);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: var(--dg-shadow-sm);
+}
+
+.dg-hero-expanded .dg-cart-shipping-rate {
+  background: rgba(21, 24, 29, 0.6);
+}
+
+.dg-hero-expanded .dg-cart-address-form input,
+.dg-hero-expanded .dg-cart-address-form select {
+  background: rgba(10, 12, 14, 0.55);
+}
+
+.dg-hero-expanded .dg-order-confirmation {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.dg-hero-expanded .dg-cart-view-footer {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0.75rem 0.5rem 1.25rem;
+  border-top: none;
   background: transparent;
 }
 
