@@ -18,6 +18,7 @@ export interface RateLimitResult {
 
 let ipRateLimiter: Ratelimit | null = null;
 let sessionRateLimiter: Ratelimit | null = null;
+let restockNotifyRateLimiter: Ratelimit | null = null;
 
 function getIpRateLimiter(): Ratelimit {
   if (!ipRateLimiter) {
@@ -43,6 +44,27 @@ function getSessionRateLimiter(): Ratelimit {
   }
 
   return sessionRateLimiter;
+}
+
+function getRestockNotifyRateLimiter(): Ratelimit {
+  if (!restockNotifyRateLimiter) {
+    restockNotifyRateLimiter = new Ratelimit({
+      redis: getRedis(),
+      // Genuine restock interest is low-frequency by nature — one request per
+      // product a shopper cares about — so this stays tight to blunt form
+      // spam/abuse without needing a CAPTCHA.
+      limiter: Ratelimit.slidingWindow(5, "1 h"),
+      prefix: "ratelimit:restock-notify:ip",
+      analytics: true,
+    });
+  }
+
+  return restockNotifyRateLimiter;
+}
+
+export async function checkRestockNotifyRateLimit(ip: string): Promise<boolean> {
+  const result = await getRestockNotifyRateLimiter().limit(ip);
+  return result.success;
 }
 
 export function rateLimitMessage(kind: RateLimitKind): string {

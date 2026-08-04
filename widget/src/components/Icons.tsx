@@ -130,6 +130,26 @@ export function DotsIcon({ className, size = 14 }: IconProps) {
   );
 }
 
+export function HeartIcon({ className, size = 14, filled = false }: IconProps & { filled?: boolean }) {
+  return (
+    <svg
+      className={className}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      aria-hidden="true"
+    >
+      <path
+        d="M12 20.2s-7.6-4.6-10-9.3C.4 7.6 2.3 4 5.7 4c1.9 0 3.5 1 4.6 2.5C11.4 5 13 4 14.9 4c3.4 0 5.3 3.6 3.7 6.9-2.4 4.7-10 9.3-10 9.3-.4.2-.4.2-.6 0Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function CloseIcon({ className, size = 14 }: IconProps) {
   return (
     <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">

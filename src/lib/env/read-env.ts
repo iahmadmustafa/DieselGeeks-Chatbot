@@ -271,6 +271,31 @@ export function getAllowedOrigins(): string[] {
   return origins.filter((origin) => !isLocalhostOrigin(origin));
 }
 
+export function getResendApiKey(): string | null {
+  return readEnvLocalValue("RESEND_API_KEY") ?? readEnv("RESEND_API_KEY");
+}
+
+/** Who "notify me when back in stock" requests get emailed to. */
+export function getRestockNotifyEmail(): string {
+  return (
+    readEnvLocalValue("RESTOCK_NOTIFY_EMAIL") ?? readEnv("RESTOCK_NOTIFY_EMAIL") ?? "ahmad@placentek.com"
+  );
+}
+
+/**
+ * Resend's shared `onboarding@resend.dev` sender works with no setup, but
+ * only delivers to the email address the Resend account itself is signed up
+ * with until a sending domain is verified — fine for early testing, but
+ * `RESEND_FROM_EMAIL` should be set to an address on a verified domain
+ * (e.g. `notifications@dieselgeeks.com.au`) before relying on this in
+ * production so it can actually reach arbitrary customer/staff inboxes.
+ */
+export function getResendFromEmail(): string {
+  return (
+    readEnvLocalValue("RESEND_FROM_EMAIL") ?? readEnv("RESEND_FROM_EMAIL") ?? "Diesel Geeks <onboarding@resend.dev>"
+  );
+}
+
 export function getFitmentLlmReasoningEffort(): FitmentLlmReasoningEffort {
   const configured =
     readEnvLocalValue("FITMENT_LLM_REASONING_EFFORT") ??

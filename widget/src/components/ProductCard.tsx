@@ -3,7 +3,8 @@ import * as React from "react";
 import { addProductToCart, notifyCartAdded } from "../add-to-cart";
 import { fetchLiveStockStatus, type LiveStockStatus } from "../store-product";
 import type { ProductCard } from "../types";
-import { CartIcon, CheckIcon } from "./Icons";
+import { CartIcon, CheckIcon, HeartIcon } from "./Icons";
+import { NotifyRestockModal } from "./NotifyRestockModal";
 
 const SUCCESS_DISPLAY_MS = 1600;
 
@@ -40,6 +41,7 @@ export function ProductCardView({ product }: { product: ProductCard }) {
   const stock = stockLabel(stockStatus);
   const [addState, setAddState] = React.useState<AddState>("idle");
   const [addError, setAddError] = React.useState<string | null>(null);
+  const [showNotifyModal, setShowNotifyModal] = React.useState(false);
   const successTimeoutRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
@@ -156,9 +158,24 @@ export function ProductCardView({ product }: { product: ProductCard }) {
               )}
             </button>
           ) : null}
+          {stockStatus === "outofstock" ? (
+            <button
+              type="button"
+              className="dg-icon-btn dg-notify-btn"
+              onClick={() => setShowNotifyModal(true)}
+              aria-label="Notify me when back in stock"
+              title="Notify me when back in stock"
+            >
+              <HeartIcon size={15} />
+            </button>
+          ) : null}
         </div>
         {addError ? <p className="dg-product-error">{addError}</p> : null}
       </div>
+
+      {showNotifyModal ? (
+        <NotifyRestockModal product={product} onClose={() => setShowNotifyModal(false)} />
+      ) : null}
     </article>
   );
 }

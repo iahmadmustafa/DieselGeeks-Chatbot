@@ -581,6 +581,219 @@ export const WIDGET_CSS = `
   opacity: 0.6;
 }
 
+.dg-notify-btn {
+  color: var(--dg-danger);
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.dg-notify-btn:hover {
+  color: #fff;
+  background: var(--dg-danger);
+  border-color: var(--dg-danger);
+  transform: translateY(-1px);
+}
+
+/* ---------- Notify-me-when-in-stock modal ---------- */
+
+/*
+ * position: fixed so this always covers the real viewport regardless of
+ * where the triggering product card sits (floating corner panel or the
+ * full-bleed hero) — same reasoning as .dg-payment-confirming-backdrop.
+ */
+.dg-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483005;
+  background: rgba(6, 8, 11, 0.72);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  animation: dg-modal-fade-in var(--dg-dur-base) var(--dg-ease-out);
+}
+
+@keyframes dg-modal-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.dg-modal {
+  position: relative;
+  width: 100%;
+  max-width: 26rem;
+  max-height: min(88vh, 640px);
+  overflow-y: auto;
+  background: linear-gradient(165deg, var(--dg-surface-2) 0%, var(--dg-surface) 100%);
+  border: 1px solid var(--dg-border-strong);
+  border-radius: var(--dg-radius-lg);
+  box-shadow: var(--dg-shadow-lg);
+  padding: 1.75rem 1.5rem 1.5rem;
+  animation: dg-modal-pop-in var(--dg-dur-slow) var(--dg-ease-spring);
+}
+
+@keyframes dg-modal-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.dg-modal-close {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: var(--dg-radius-full);
+  border: 1px solid var(--dg-border);
+  background: var(--dg-surface);
+  color: var(--dg-muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: color var(--dg-dur-fast) ease, border-color var(--dg-dur-fast) ease;
+}
+
+.dg-modal-close:hover {
+  color: var(--dg-text);
+  border-color: var(--dg-border-strong);
+}
+
+.dg-modal-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dg-danger-soft);
+  color: var(--dg-danger);
+  margin: 0 auto 0.9rem;
+}
+
+.dg-modal-title {
+  margin: 0 0 0.4rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--dg-text);
+  text-align: center;
+}
+
+.dg-modal-subtitle {
+  margin: 0 0 1.3rem;
+  font-size: 0.83rem;
+  color: var(--dg-text-secondary);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.dg-modal-subtitle strong {
+  color: var(--dg-text);
+}
+
+.dg-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.dg-modal-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+
+.dg-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--dg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.dg-modal-field input,
+.dg-modal-field textarea {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--dg-text);
+  background: var(--dg-bg-soft);
+  border: 1px solid var(--dg-border-strong);
+  border-radius: var(--dg-radius-sm);
+  padding: 0.6rem 0.7rem;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  transition: border-color var(--dg-dur-fast) ease, box-shadow var(--dg-dur-fast) ease;
+}
+
+.dg-modal-field input::placeholder,
+.dg-modal-field textarea::placeholder {
+  color: var(--dg-muted);
+}
+
+.dg-modal-field input:focus,
+.dg-modal-field textarea:focus {
+  outline: none;
+  border-color: var(--dg-accent);
+  box-shadow: 0 0 0 3px var(--dg-accent-soft);
+}
+
+.dg-modal-submit {
+  width: 100%;
+  justify-content: center;
+  margin-top: 0.3rem;
+}
+
+.dg-modal-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.dg-modal-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0 0.25rem;
+}
+
+.dg-modal-success h3 {
+  margin: 0.2rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--dg-text);
+}
+
+.dg-modal-success p {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  color: var(--dg-text-secondary);
+}
+
+@media (max-width: 480px) {
+  .dg-modal-field-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ---------- Cart shipping (stage 2) ---------- */
 
 .dg-cart-shipping {
