@@ -174,7 +174,7 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
               onBack={() => setView("chat")}
               onUpdateAddress={storeCart.updateShippingAddress}
               onSelectRate={storeCart.selectShippingRate}
-              onRemoveItem={storeCart.removeItem}
+              onRemoveItem={storeCart.decrementItem}
             />
           ) : (
             <ChatThread

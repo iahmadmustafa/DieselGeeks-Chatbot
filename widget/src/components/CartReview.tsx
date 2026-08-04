@@ -20,7 +20,7 @@ interface CartReviewProps {
   onBack: () => void;
   onUpdateAddress: (address: Partial<StoreApiAddress>) => Promise<StoreCartMutationResult>;
   onSelectRate: (packageId: number | string, rateId: string) => Promise<StoreCartMutationResult>;
-  onRemoveItem: (itemKey: string) => Promise<StoreCartMutationResult>;
+  onRemoveItem: (itemKey: string, currentQuantity: number) => Promise<StoreCartMutationResult>;
 }
 
 /**
@@ -46,10 +46,10 @@ export function CartReview({
   const [removingKey, setRemovingKey] = React.useState<string | null>(null);
   const [removeError, setRemoveError] = React.useState<string | null>(null);
 
-  async function handleRemoveItem(itemKey: string): Promise<void> {
+  async function handleRemoveItem(itemKey: string, currentQuantity: number): Promise<void> {
     setRemoveError(null);
     setRemovingKey(itemKey);
-    const result = await onRemoveItem(itemKey);
+    const result = await onRemoveItem(itemKey, currentQuantity);
     setRemovingKey(null);
     if (!result.ok) {
       setRemoveError(result.error);
@@ -175,10 +175,10 @@ export function CartReview({
                     <button
                       type="button"
                       className="dg-cart-item-remove"
-                      onClick={() => void handleRemoveItem(item.key)}
+                      onClick={() => void handleRemoveItem(item.key, item.quantity)}
                       disabled={isRemoving}
-                      aria-label={`Remove ${item.name} from cart`}
-                      title="Remove from cart"
+                      aria-label={item.quantity > 1 ? `Remove one ${item.name}` : `Remove ${item.name} from cart`}
+                      title={item.quantity > 1 ? "Remove one" : "Remove from cart"}
                     >
                       {isRemoving ? <span className="dg-spinner" aria-hidden="true" /> : <TrashIcon size={14} />}
                     </button>

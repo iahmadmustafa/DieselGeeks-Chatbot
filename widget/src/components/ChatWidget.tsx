@@ -143,7 +143,7 @@ export function ChatWidget({ apiBase, logoUrl, isOpen, isMobile, onClose }: Chat
           onBack={() => setView("chat")}
           onUpdateAddress={storeCart.updateShippingAddress}
           onSelectRate={storeCart.selectShippingRate}
-          onRemoveItem={storeCart.removeItem}
+          onRemoveItem={storeCart.decrementItem}
         />
       ) : (
         <ChatThread

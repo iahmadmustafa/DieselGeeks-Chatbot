@@ -444,6 +444,25 @@ export async function removeCartItem(itemKey: string): Promise<StoreApiCartResul
   return toCartResult(result);
 }
 
+/**
+ * Sets a line item's quantity (by its cart item `key`) and returns the
+ * updated cart. Used to decrement one unit at a time from the cart view's
+ * remove button instead of always dropping the whole line — see
+ * CartReview.tsx's handleRemoveItem for the "quantity > 1 ? decrement :
+ * remove" logic this backs.
+ */
+export async function updateCartItemQuantity(
+  itemKey: string,
+  quantity: number,
+): Promise<StoreApiCartResult> {
+  const result = await storeApiRequest<StoreApiCart>("/cart/update-item", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key: itemKey, quantity }),
+  });
+  return toCartResult(result);
+}
+
 /** Selects a shipping rate for a package; returns the cart with updated totals. */
 export async function selectShippingRate(
   packageId: number | string,

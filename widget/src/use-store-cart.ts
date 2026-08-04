@@ -6,6 +6,7 @@ import {
   getCart,
   removeCartItem as removeCartItemApi,
   selectShippingRate as selectShippingRateApi,
+  updateCartItemQuantity as updateCartItemQuantityApi,
   updateCustomerAddress as updateCustomerAddressApi,
   type StoreApiAddress,
   type StoreApiCart,
@@ -23,6 +24,7 @@ export interface StoreCartState {
   updateShippingAddress: (address: Partial<StoreApiAddress>) => Promise<StoreCartMutationResult>;
   selectShippingRate: (packageId: number | string, rateId: string) => Promise<StoreCartMutationResult>;
   removeItem: (itemKey: string) => Promise<StoreCartMutationResult>;
+  decrementItem: (itemKey: string, currentQuantity: number) => Promise<StoreCartMutationResult>;
 }
 
 /**
@@ -132,6 +134,32 @@ export function useStoreCart(enabled: boolean): StoreCartState {
     return { ok: true };
   }, []);
 
+  /**
+   * One click of the cart view's remove button should take a stack of
+   * multiple units down by one unit, not drop the whole line — dropping
+   * straight to `removeCartItemApi` (a full-line delete) was the bug: adding
+   * the same product 2-3 times built up quantity on a single line item, and
+   * "remove" deleted that entire line in one click instead of one unit.
+   * Only the last remaining unit actually removes the line.
+   */
+  const decrementItem = React.useCallback(
+    async (itemKey: string, currentQuantity: number): Promise<StoreCartMutationResult> => {
+      if (currentQuantity <= 1) {
+        return removeItem(itemKey);
+      }
+
+      const result = await updateCartItemQuantityApi(itemKey, currentQuantity - 1);
+      if (!result.ok) {
+        return { ok: false, error: result.error };
+      }
+      invalidateInFlightLoads();
+      setCart(result.cart);
+      setStatus("ready");
+      return { ok: true };
+    },
+    [removeItem],
+  );
+
   return {
     status,
     cart,
@@ -140,5 +168,6 @@ export function useStoreCart(enabled: boolean): StoreCartState {
     updateShippingAddress,
     selectShippingRate,
     removeItem,
+    decrementItem,
   };
 }
