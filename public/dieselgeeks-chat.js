@@ -1264,13 +1264,21 @@ ${_}`,p++;break;case"id":u=_.includes("\0")?void 0:_;break;case"retry":/^\d+$/.t
   scroll-behavior: auto;
 }
 
+/* Firefox has no ::-webkit-scrollbar support, so it needs this shorthand instead to get the same thin/subtle treatment. */
+.dg-messages {
+  scrollbar-width: thin;
+  scrollbar-color: var(--dg-border-strong) transparent;
+}
+
 .dg-messages::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 .dg-messages::-webkit-scrollbar-thumb {
-  background: var(--dg-border-strong);
+  background-color: var(--dg-border-strong);
   border-radius: var(--dg-radius-full);
+  border: 1px solid transparent;
+  background-clip: padding-box;
 }
 
 .dg-messages::-webkit-scrollbar-track {
@@ -2643,35 +2651,35 @@ ${_}`,p++;break;case"id":u=_.includes("\0")?void 0:_;break;case"retry":/^\d+$/.t
  */
 .dg-hero-sidebar,
 .dg-hero-side-panel-body,
-.dg-hero-chat-col .dg-messages {
+.dg-hero-expanded .dg-messages {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
 }
 
 .dg-hero-sidebar::-webkit-scrollbar,
 .dg-hero-side-panel-body::-webkit-scrollbar,
-.dg-hero-chat-col .dg-messages::-webkit-scrollbar {
-  width: 8px;
+.dg-hero-expanded .dg-messages::-webkit-scrollbar {
+  width: 6px;
 }
 
 .dg-hero-sidebar::-webkit-scrollbar-track,
 .dg-hero-side-panel-body::-webkit-scrollbar-track,
-.dg-hero-chat-col .dg-messages::-webkit-scrollbar-track {
+.dg-hero-expanded .dg-messages::-webkit-scrollbar-track {
   background: transparent;
 }
 
 .dg-hero-sidebar::-webkit-scrollbar-thumb,
 .dg-hero-side-panel-body::-webkit-scrollbar-thumb,
-.dg-hero-chat-col .dg-messages::-webkit-scrollbar-thumb {
+.dg-hero-expanded .dg-messages::-webkit-scrollbar-thumb {
   background-color: rgba(255, 255, 255, 0.18);
   border-radius: var(--dg-radius-full);
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   background-clip: padding-box;
 }
 
 .dg-hero-sidebar::-webkit-scrollbar-thumb:hover,
 .dg-hero-side-panel-body::-webkit-scrollbar-thumb:hover,
-.dg-hero-chat-col .dg-messages::-webkit-scrollbar-thumb:hover {
+.dg-hero-expanded .dg-messages::-webkit-scrollbar-thumb:hover {
   background-color: rgba(101, 210, 213, 0.45);
   background-clip: padding-box;
 }
