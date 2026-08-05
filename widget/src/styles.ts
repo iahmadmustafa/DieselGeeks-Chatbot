@@ -1870,6 +1870,16 @@ export const WIDGET_CSS = `
    * wraps it.
    */
   height: min(88vh, 820px);
+  /*
+   * A flush 0 gap here meant scrolled-up message text visually ran straight
+   * into whatever sits above this section on the page (typically the site's
+   * sticky navbar) — there was no breathing room between "site chrome" and
+   * "widget content", so it read as a layout bug rather than two separate
+   * things stacked on a page. This margin is entirely self-contained (no
+   * assumption about Elementor section spacing), so it holds regardless of
+   * how the surrounding page is built.
+   */
+  margin-top: 1.25rem;
   overflow: hidden;
   color: var(--dg-text);
   background-color: #05070a;
@@ -2102,7 +2112,8 @@ export const WIDGET_CSS = `
   position: absolute;
   top: 0.85rem;
   right: 0.85rem;
-  z-index: 2;
+  /* Above .dg-hero-expanded/.dg-hero-chat-col's top-edge fade overlay (z-index: 2) so the buttons stay crisp, not dimmed by it. */
+  z-index: 3;
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -2178,6 +2189,31 @@ export const WIDGET_CSS = `
   max-width: 820px;
   margin: 0 auto;
   padding-top: 3.5rem;
+}
+
+/*
+ * Soft fade at the top edge of the scrollable message area, so text
+ * scrolling upward dissolves away instead of getting cut off hard right at
+ * the panel's edge (which sits close under the site navbar/corner buttons).
+ * Lives on the non-scrolling wrapper as a fixed overlay, not on .dg-messages
+ * itself, so it stays put while the content underneath scrolls past it.
+ */
+.dg-hero-expanded,
+.dg-hero-chat-col {
+  position: relative;
+}
+
+.dg-hero-expanded::before,
+.dg-hero-chat-col::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2.5rem;
+  background: linear-gradient(180deg, rgba(5, 7, 10, 0.85) 0%, rgba(5, 7, 10, 0) 100%);
+  pointer-events: none;
+  z-index: 2;
 }
 
 /*
@@ -2597,6 +2633,7 @@ export const WIDGET_CSS = `
 
   .dg-hero {
     height: min(90vh, 640px);
+    margin-top: 0.75rem;
   }
 
   .dg-hero-idle {
