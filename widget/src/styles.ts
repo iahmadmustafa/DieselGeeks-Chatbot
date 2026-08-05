@@ -2189,31 +2189,18 @@ export const WIDGET_CSS = `
   max-width: 820px;
   margin: 0 auto;
   padding-top: 3.5rem;
-}
-
-/*
- * Soft fade at the top edge of the scrollable message area, so text
- * scrolling upward dissolves away instead of getting cut off hard right at
- * the panel's edge (which sits close under the site navbar/corner buttons).
- * Lives on the non-scrolling wrapper as a fixed overlay, not on .dg-messages
- * itself, so it stays put while the content underneath scrolls past it.
- */
-.dg-hero-expanded,
-.dg-hero-chat-col {
-  position: relative;
-}
-
-.dg-hero-expanded::before,
-.dg-hero-chat-col::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2.5rem;
-  background: linear-gradient(180deg, rgba(5, 7, 10, 0.85) 0%, rgba(5, 7, 10, 0) 100%);
-  pointer-events: none;
-  z-index: 2;
+  /*
+   * Dissolves scrolled-up text out at the very top of the scroll area
+   * instead of it hard-cutting at the panel edge (close under the site
+   * navbar/corner buttons). This masks the content's own opacity rather
+   * than painting a tinted rectangle over it — an overlay approach here
+   * previously showed up as an ugly solid dark bar, and (being on the
+   * shared wrapper) incorrectly covered the side panel/tabs above too. A
+   * mask on .dg-messages itself only ever affects this column's own
+   * scrolling text, nothing else.
+   */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 2.25rem, #000 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 2.25rem, #000 100%);
 }
 
 /*
