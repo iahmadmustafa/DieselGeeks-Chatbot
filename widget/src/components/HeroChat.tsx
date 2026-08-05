@@ -94,7 +94,18 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
   const isBusy = status === "submitted" || status === "streaming";
   const isExpanded = started || view === "cart";
   const storeCart = useStoreCart(isExpanded);
-  const allProducts = useMemo(() => getAllProductsFromMessages(messages), [messages]);
+  /*
+   * Mirrors ChatThread's per-message holdback: while the latest reply is
+   * still being generated, its products (which usually resolve before the
+   * text finishes streaming) are left out of the aggregate so the right
+   * panel doesn't pop open/update ahead of the reply that's introducing
+   * them. Everything from earlier, already-finished turns still shows
+   * immediately.
+   */
+  const allProducts = useMemo(() => {
+    const messagesForProducts = isBusy && messages.length > 0 ? messages.slice(0, -1) : messages;
+    return getAllProductsFromMessages(messagesForProducts);
+  }, [messages, isBusy]);
   /*
    * The right panel is only worth the screen space once there's something to
    * put in it — an empty "recommended products" placeholder sitting there

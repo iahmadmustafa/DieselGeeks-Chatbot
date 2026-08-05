@@ -147,10 +147,19 @@ export function ChatThread({
 
         {messages.map((message) => {
           const text = getMessageText(message);
-          const products = getProductsFromMessage(message);
           const isUser = message.role === "user";
-          const isStreamingThisMessage =
-            !isUser && status === "streaming" && message.id === lastMessageId && text.length > 0;
+          const isLastMessage = message.id === lastMessageId;
+          /*
+           * The product search tool call typically resolves before the
+           * assistant's text reply finishes streaming in — showing cards the
+           * moment they're ready, while the reply is still mid-sentence,
+           * made them "pop in first" ahead of the text they're meant to
+           * accompany. Holding them back on the in-progress message only
+           * (everything earlier in the thread already finished and shows
+           * normally) means both land together once the reply completes.
+           */
+          const products = isLastMessage && isBusy ? [] : getProductsFromMessage(message);
+          const isStreamingThisMessage = !isUser && status === "streaming" && isLastMessage && text.length > 0;
 
           // A product-only reply (no accompanying text) would otherwise render
           // as an empty bubble-less row once its cards are hidden here in
