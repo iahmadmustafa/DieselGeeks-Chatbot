@@ -35,7 +35,14 @@ function stockLabel(status: string): { label: string; className: string } {
   }
 }
 
-export function ProductCardView({ product }: { product: ProductCard }) {
+export function ProductCardView({
+  product,
+  style,
+}: {
+  product: ProductCard;
+  /** Lets callers pass a --dg-stagger custom property for a cascading fade-in delay; see styles.ts's .dg-products/.dg-hero-panel-products. */
+  style?: React.CSSProperties;
+}) {
   const [liveStockStatus, setLiveStockStatus] = React.useState<LiveStockStatus | null>(null);
   const stockStatus = liveStockStatus ?? product.stock_status;
   const stock = stockLabel(stockStatus);
@@ -103,7 +110,7 @@ export function ProductCardView({ product }: { product: ProductCard }) {
   }
 
   return (
-    <article className="dg-product-card">
+    <article className="dg-product-card" style={style}>
       <div className="dg-product-image-wrap">
         {product.image_url ? (
           <img className="dg-product-image" src={product.image_url} alt={product.title} loading="lazy" />

@@ -95,27 +95,21 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
   const isExpanded = started || view === "cart";
   const storeCart = useStoreCart(isExpanded);
   /*
-   * Mirrors ChatThread's per-message holdback: while the latest reply is
-   * still being generated, its products (which usually resolve before the
-   * text finishes streaming) are left out of the aggregate so the right
-   * panel doesn't pop open/update ahead of the reply that's introducing
-   * them. Everything from earlier, already-finished turns still shows
-   * immediately.
+   * Mirrors ChatThread's per-message holdback: a message's products are
+   * left out of the aggregate only until *that* message's own text has
+   * started appearing (not until the whole reply is fully done) — see the
+   * matching comment in ChatThread.tsx for why. Everything from earlier,
+   * already-finished turns always shows immediately regardless.
    */
   const allProducts = useMemo(() => {
-    const messagesForProducts = isBusy && messages.length > 0 ? messages.slice(0, -1) : messages;
-    return getAllProductsFromMessages(messagesForProducts);
+    if (messages.length === 0) {
+      return [];
+    }
+    const last = messages[messages.length - 1];
+    const lastHasText = last.parts.some((part) => part.type === "text" && part.text.length > 0);
+    const holdBackLast = isBusy && last.role === "assistant" && !lastHasText;
+    return getAllProductsFromMessages(holdBackLast ? messages.slice(0, -1) : messages);
   }, [messages, isBusy]);
-  /*
-   * The right panel is only worth the screen space once there's something to
-   * put in it — an empty "recommended products" placeholder sitting there
-   * from the first message onward just eats width for nothing. It shows up
-   * automatically the moment the assistant surfaces products or the cart
-   * has items, and stays available (via the corner cart button below) so
-   * "Cart" is never unreachable even with an empty cart and no products yet.
-   */
-  const hasCartItems = !!storeCart.cart && storeCart.cart.items_count > 0;
-  const showSidePanel = isDesktop && isExpanded && (allProducts.length > 0 || hasCartItems || desktopPanelTab === "cart");
 
   React.useEffect(() => {
     if (status === "submitted" || status === "streaming") {
@@ -204,7 +198,7 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
         to be showing.
       */}
       <div className="dg-hero-corner-actions">
-        {!(isDesktop && isExpanded) || !showSidePanel ? (
+        {!(isDesktop && isExpanded) ? (
           <button
             type="button"
             className="dg-icon-btn dg-cart-btn dg-hero-cart-btn"
@@ -232,7 +226,7 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
       </div>
 
       {isExpanded && isDesktop ? (
-        <div className={`dg-hero-expanded dg-hero-3col${showSidePanel ? "" : " dg-hero-3col-no-panel"}`}>
+        <div className="dg-hero-expanded dg-hero-3col">
           <aside className="dg-hero-sidebar">
             <button type="button" className="dg-hero-new-chat-btn" onClick={handleNewChat}>
               <PlusIcon size={14} />
@@ -266,50 +260,57 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
             />
           </div>
 
-          {showSidePanel ? (
-            <aside className="dg-hero-side-panel">
-              <div className="dg-hero-panel-tabs" role="tablist">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={desktopPanelTab === "products"}
-                  className={`dg-hero-panel-tab${desktopPanelTab === "products" ? " dg-hero-panel-tab-active" : ""}`}
-                  onClick={() => setDesktopPanelTab("products")}
-                >
-                  Recommended
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={desktopPanelTab === "cart"}
-                  className={`dg-hero-panel-tab${desktopPanelTab === "cart" ? " dg-hero-panel-tab-active" : ""}`}
-                  onClick={() => {
-                    setDesktopPanelTab("cart");
-                    storeCart.refresh();
-                  }}
-                >
-                  Cart
-                  {storeCart.cart && storeCart.cart.items_count > 0 ? (
-                    <span className="dg-hero-panel-tab-badge">{storeCart.cart.items_count}</span>
-                  ) : null}
-                </button>
-              </div>
+          <aside className="dg-hero-side-panel">
+            <div className="dg-hero-panel-tabs" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={desktopPanelTab === "products"}
+                className={`dg-hero-panel-tab${desktopPanelTab === "products" ? " dg-hero-panel-tab-active" : ""}`}
+                onClick={() => setDesktopPanelTab("products")}
+              >
+                Recommended
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={desktopPanelTab === "cart"}
+                className={`dg-hero-panel-tab${desktopPanelTab === "cart" ? " dg-hero-panel-tab-active" : ""}`}
+                onClick={() => {
+                  setDesktopPanelTab("cart");
+                  storeCart.refresh();
+                }}
+              >
+                Cart
+                {storeCart.cart && storeCart.cart.items_count > 0 ? (
+                  <span className="dg-hero-panel-tab-badge">{storeCart.cart.items_count}</span>
+                ) : null}
+              </button>
+            </div>
 
-              <div className="dg-hero-side-panel-body">
-                {desktopPanelTab === "products" ? (
-                  allProducts.length > 0 ? (
-                    <div className="dg-hero-panel-products">
-                      {allProducts.map((product) => (
-                        <ProductCardView key={product.id} product={product} />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="dg-hero-panel-empty">
-                      <SparkleIcon size={22} />
-                      <p>Products the assistant finds will show up here as you chat.</p>
-                    </div>
-                  )
+            {/*
+              key forces a fresh mount (and therefore its fade-in animation
+              — see .dg-hero-panel-fade below) whenever the tab or the
+              product list identity changes, so switching tabs or a fresh
+              batch of products landing both get the same smooth crossfade
+              instead of snapping in instantly.
+            */}
+            <div className="dg-hero-side-panel-body" key={desktopPanelTab === "products" ? "products" : "cart"}>
+              {desktopPanelTab === "products" ? (
+                allProducts.length > 0 ? (
+                  <div className="dg-hero-panel-products dg-hero-panel-fade" key={allProducts.length}>
+                    {allProducts.map((product, index) => (
+                      <ProductCardView key={product.id} product={product} style={{ "--dg-stagger": index } as React.CSSProperties} />
+                    ))}
+                  </div>
                 ) : (
+                  <div className="dg-hero-panel-empty dg-hero-panel-fade">
+                    <SparkleIcon size={22} />
+                    <p>Products the assistant finds will show up here as you chat.</p>
+                  </div>
+                )
+              ) : (
+                <div className="dg-hero-panel-fade">
                   <CartReview
                     cart={storeCart.cart}
                     status={storeCart.status}
@@ -321,10 +322,10 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
                     onRemoveItem={storeCart.decrementItem}
                     embedded
                   />
-                )}
-              </div>
-            </aside>
-          ) : null}
+                </div>
+              )}
+            </div>
+          </aside>
         </div>
       ) : isExpanded ? (
         <div className="dg-hero-expanded">

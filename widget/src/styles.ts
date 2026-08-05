@@ -1405,6 +1405,27 @@ export const WIDGET_CSS = `
   border: 1px solid var(--dg-border);
   transition: transform var(--dg-dur-fast) var(--dg-ease-out), border-color var(--dg-dur-fast) ease,
     box-shadow var(--dg-dur-fast) ease;
+  /*
+   * Cards used to all land in one instant, in-your-face batch the moment
+   * the tool result was ready. Each one now fades/slides in on its own,
+   * a beat after the one before it (--dg-stagger, set per-card by
+   * ChatThread.tsx/HeroChat.tsx as its index in the list) so a multi-result
+   * reply reveals itself as a gentle cascade instead of a single flash.
+   */
+  opacity: 0;
+  animation: dg-product-card-in var(--dg-dur-slow) var(--dg-ease-out) forwards;
+  animation-delay: calc(var(--dg-stagger, 0) * 90ms);
+}
+
+@keyframes dg-product-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .dg-product-card:hover {
@@ -2332,10 +2353,6 @@ export const WIDGET_CSS = `
   overflow: hidden;
 }
 
-/* No products or cart items yet — the chat column takes the freed-up width instead of leaving it empty. */
-.dg-hero-3col.dg-hero-3col-no-panel {
-  grid-template-columns: 15.5rem minmax(0, 1fr);
-}
 
 .dg-hero-sidebar {
   display: flex;
@@ -2486,6 +2503,26 @@ export const WIDGET_CSS = `
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
+}
+
+/*
+ * Crossfade for whatever's currently occupying the side panel body — a tab
+ * switch, the empty state handing off to real cards, or a fresh batch of
+ * products landing. Paired with the key prop on .dg-hero-side-panel-body in
+ * HeroChat.tsx, which remounts (replaying this animation) exactly when one
+ * of those transitions happens, instead of the content just snapping in.
+ */
+.dg-hero-panel-fade {
+  animation: dg-hero-panel-fade-in var(--dg-dur-base) var(--dg-ease-out);
+}
+
+@keyframes dg-hero-panel-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .dg-hero-panel-empty {

@@ -151,14 +151,17 @@ export function ChatThread({
           const isLastMessage = message.id === lastMessageId;
           /*
            * The product search tool call typically resolves before the
-           * assistant's text reply finishes streaming in — showing cards the
-           * moment they're ready, while the reply is still mid-sentence,
-           * made them "pop in first" ahead of the text they're meant to
-           * accompany. Holding them back on the in-progress message only
-           * (everything earlier in the thread already finished and shows
-           * normally) means both land together once the reply completes.
+           * assistant's text reply starts streaming in — showing cards the
+           * instant they're ready, while there's no reply text on screen
+           * yet at all, made them "pop in first" with nothing to accompany.
+           * Waiting for full completion instead over-corrected the other
+           * way (a long, empty-feeling gap before anything shows up).
+           * Holding back only until *this* message's first bit of text has
+           * appeared — not until it's fully finished — lands them together
+           * right as the reply starts forming, then lets both keep
+           * streaming/animating in alongside each other.
            */
-          const products = isLastMessage && isBusy ? [] : getProductsFromMessage(message);
+          const products = isLastMessage && isBusy && text.length === 0 ? [] : getProductsFromMessage(message);
           const isStreamingThisMessage = !isUser && status === "streaming" && isLastMessage && text.length > 0;
 
           // A product-only reply (no accompanying text) would otherwise render
@@ -195,8 +198,12 @@ export function ChatThread({
 
                         {!isUser && !hideInlineProducts && products.length > 0 ? (
                           <div className="dg-products">
-                            {products.map((product) => (
-                              <ProductCardView key={product.id} product={product} />
+                            {products.map((product, index) => (
+                              <ProductCardView
+                                key={product.id}
+                                product={product}
+                                style={{ "--dg-stagger": index } as React.CSSProperties}
+                              />
                             ))}
                           </div>
                         ) : null}
