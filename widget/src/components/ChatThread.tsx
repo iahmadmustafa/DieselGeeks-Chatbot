@@ -1,7 +1,8 @@
 import * as React from "react";
 
 import { renderMessageBody } from "../format-message";
-import type { ChatUIMessage, ProductCard } from "../types";
+import { getProductsFromMessage } from "../get-products-from-messages";
+import type { ChatUIMessage } from "../types";
 import { ProductCardView } from "./ProductCard";
 import { BrandLogo } from "./BrandLogo";
 import { TypingIndicator } from "./TypingIndicator";
@@ -18,37 +19,6 @@ function getMessageText(message: ChatUIMessage): string {
     .join("");
 }
 
-function getProductsFromMessage(message: ChatUIMessage): ProductCard[] {
-  const products: ProductCard[] = [];
-
-  for (const part of message.parts) {
-    if (part.type === "data-products" && Array.isArray(part.data)) {
-      products.push(...part.data);
-      continue;
-    }
-
-    if (
-      part.type === "tool-search_products" &&
-      part.state === "output-available" &&
-      part.output &&
-      typeof part.output === "object" &&
-      "products" in part.output &&
-      Array.isArray(part.output.products)
-    ) {
-      products.push(...(part.output.products as ProductCard[]));
-    }
-  }
-
-  const seen = new Set<number>();
-  return products.filter((product) => {
-    if (seen.has(product.id)) {
-      return false;
-    }
-    seen.add(product.id);
-    return true;
-  });
-}
-
 interface ChatThreadProps {
   messages: ChatUIMessage[];
   status: string;
@@ -60,6 +30,14 @@ interface ChatThreadProps {
   onSubmitText: (text: string) => void;
   logoUrl: string;
   inputPlaceholder?: string;
+  /**
+   * The desktop 3-column layout (see HeroChat.tsx) shows product cards in
+   * their own dedicated right-hand panel instead of inline in the
+   * conversation, so the middle column stays a clean, focused text thread.
+   * Mobile/the floating corner widget don't set this — there's no separate
+   * panel there, so cards stay inline as before.
+   */
+  hideInlineProducts?: boolean;
 }
 
 /**
@@ -78,6 +56,7 @@ export function ChatThread({
   onSubmitText,
   logoUrl,
   inputPlaceholder = "e.g. 4JJ1 injectors for a 2010 Isuzu D-Max",
+  hideInlineProducts = false,
 }: ChatThreadProps) {
   const messagesContainerRef = React.useRef<HTMLDivElement | null>(null);
   const messagesEndRef = React.useRef<HTMLDivElement | null>(null);
@@ -173,7 +152,10 @@ export function ChatThread({
           const isStreamingThisMessage =
             !isUser && status === "streaming" && message.id === lastMessageId && text.length > 0;
 
-          if (!text && products.length === 0) {
+          // A product-only reply (no accompanying text) would otherwise render
+          // as an empty bubble-less row once its cards are hidden here in
+          // favor of the desktop right panel — nothing left to show inline.
+          if (!text && (hideInlineProducts || products.length === 0)) {
             return null;
           }
 
@@ -202,13 +184,13 @@ export function ChatThread({
                   </div>
                 ) : null}
 
-                {!isUser && products.length > 0 ? (
-                  <div className="dg-products">
-                    {products.map((product) => (
-                      <ProductCardView key={product.id} product={product} />
-                    ))}
-                  </div>
-                ) : null}
+                        {!isUser && !hideInlineProducts && products.length > 0 ? (
+                          <div className="dg-products">
+                            {products.map((product) => (
+                              <ProductCardView key={product.id} product={product} />
+                            ))}
+                          </div>
+                        ) : null}
               </div>
             </div>
           );

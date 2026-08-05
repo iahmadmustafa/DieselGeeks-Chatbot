@@ -3,23 +3,31 @@ import { useMemo } from "react";
 import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
 
-import { getOrCreateSessionId } from "../session";
+import { createNewSessionId, getOrCreateSessionId } from "../session";
 import { loadStoredConversation, saveStoredConversation } from "../conversation-storage";
 import { useStoreCart } from "../use-store-cart";
+import { useMediaQuery } from "../use-media-query";
+import { getAllProductsFromMessages } from "../get-products-from-messages";
 import type { ChatUIMessage } from "../types";
 import { CartReview } from "./CartReview";
 import { BrandLogo } from "./BrandLogo";
 import { ChatThread } from "./ChatThread";
+import { ProductCardView } from "./ProductCard";
 import {
   CartIcon,
   ChatBubbleIcon,
   ClipboardIcon,
   CloseIcon,
   DotsIcon,
+  PlusIcon,
+  SparkleIcon,
   ToolsIcon,
   TruckIcon,
   WrenchIcon,
 } from "./Icons";
+
+/** Desktop/laptop only — 3-column layout collapses back to the existing single-column experience below this. */
+const DESKTOP_QUERY = "(min-width: 1024px)";
 
 const MAX_MESSAGE_LENGTH = 500;
 
@@ -45,7 +53,8 @@ interface HeroChatProps {
  * instead of a full-screen or floating panel.
  */
 export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
-  const sessionId = useMemo(() => getOrCreateSessionId(), []);
+  const isDesktop = useMediaQuery(DESKTOP_QUERY);
+  const [sessionId, setSessionId] = React.useState(() => getOrCreateSessionId());
   const restoredMessages = useMemo(() => loadStoredConversation(sessionId), [sessionId]);
   const transport = useMemo(
     () =>
@@ -64,7 +73,13 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
   });
 
   const [input, setInput] = React.useState("");
+  // Mobile/tablet: which full-screen view is showing (chat replaces cart and
+  // vice versa — there's no room for both). Desktop ignores this and shows
+  // chat permanently in the middle column; see desktopPanelTab below instead.
   const [view, setView] = React.useState<"chat" | "cart">("chat");
+  // Desktop only: which tab is active in the right-hand panel that sits
+  // alongside (not instead of) the chat column.
+  const [desktopPanelTab, setDesktopPanelTab] = React.useState<"products" | "cart">("products");
   /*
    * Deliberately always starts collapsed, even when there's restored history
    * from an earlier visit — every page load (reload, or navigating here from
@@ -79,6 +94,17 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
   const isBusy = status === "submitted" || status === "streaming";
   const isExpanded = started || view === "cart";
   const storeCart = useStoreCart(isExpanded);
+  const allProducts = useMemo(() => getAllProductsFromMessages(messages), [messages]);
+  /*
+   * The right panel is only worth the screen space once there's something to
+   * put in it — an empty "recommended products" placeholder sitting there
+   * from the first message onward just eats width for nothing. It shows up
+   * automatically the moment the assistant surfaces products or the cart
+   * has items, and stays available (via the corner cart button below) so
+   * "Cart" is never unreachable even with an empty cart and no products yet.
+   */
+  const hasCartItems = !!storeCart.cart && storeCart.cart.items_count > 0;
+  const showSidePanel = isDesktop && isExpanded && (allProducts.length > 0 || hasCartItems || desktopPanelTab === "cart");
 
   React.useEffect(() => {
     if (status === "submitted" || status === "streaming") {
@@ -97,6 +123,22 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
   function closeChat(): void {
     setStarted(false);
     setView("chat");
+    setDesktopPanelTab("products");
+  }
+
+  /*
+   * ChatGPT-style "New chat" — starts a clean conversation by swapping in a
+   * fresh session id (useChat/the transport are both keyed by it, so this
+   * resets their state too), rather than trying to clear messages in place.
+   * There's no history list to switch back to yet — login-gated chat history
+   * is planned separately — so this is a one-way reset for now, same as
+   * starting a brand new browser session would already do.
+   */
+  function handleNewChat(): void {
+    setSessionId(createNewSessionId());
+    setInput("");
+    setView("chat");
+    setDesktopPanelTab("products");
   }
 
   async function submitText(rawText: string): Promise<void> {
@@ -122,8 +164,12 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
 
   function openCartView(): void {
     setStarted(true);
-    setView("cart");
     storeCart.refresh();
+    if (isDesktop) {
+      setDesktopPanelTab("cart");
+    } else {
+      setView("cart");
+    }
   }
 
   // Built from apiBase (per-site, like logoUrl) rather than baked into
@@ -147,18 +193,20 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
         to be showing.
       */}
       <div className="dg-hero-corner-actions">
-        <button
-          type="button"
-          className="dg-icon-btn dg-cart-btn dg-hero-cart-btn"
-          onClick={openCartView}
-          aria-label="View cart"
-          aria-pressed={view === "cart"}
-        >
-          <CartIcon size={16} />
-          {storeCart.cart && storeCart.cart.items_count > 0 ? (
-            <span className="dg-cart-badge">{storeCart.cart.items_count}</span>
-          ) : null}
-        </button>
+        {!(isDesktop && isExpanded) || !showSidePanel ? (
+          <button
+            type="button"
+            className="dg-icon-btn dg-cart-btn dg-hero-cart-btn"
+            onClick={openCartView}
+            aria-label="View cart"
+            aria-pressed={isDesktop ? desktopPanelTab === "cart" : view === "cart"}
+          >
+            <CartIcon size={16} />
+            {storeCart.cart && storeCart.cart.items_count > 0 ? (
+              <span className="dg-cart-badge">{storeCart.cart.items_count}</span>
+            ) : null}
+          </button>
+        ) : null}
 
         {isExpanded ? (
           <button
@@ -172,7 +220,102 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
         ) : null}
       </div>
 
-      {isExpanded ? (
+      {isExpanded && isDesktop ? (
+        <div className={`dg-hero-expanded dg-hero-3col${showSidePanel ? "" : " dg-hero-3col-no-panel"}`}>
+          <aside className="dg-hero-sidebar">
+            <button type="button" className="dg-hero-new-chat-btn" onClick={handleNewChat}>
+              <PlusIcon size={14} />
+              New chat
+            </button>
+            {/*
+              History (multiple past conversations you can switch back to) is
+              a separate, login-gated feature planned for later — this is a
+              placeholder so the sidebar isn't just dead space until then,
+              not a promise of what's already built.
+            */}
+            <p className="dg-hero-sidebar-note">
+              <SparkleIcon size={13} />
+              Sign in soon to save and revisit past conversations.
+            </p>
+          </aside>
+
+          <div className="dg-hero-chat-col">
+            <ChatThread
+              messages={messages}
+              status={status}
+              error={error}
+              input={input}
+              setInput={setInput}
+              onSubmit={(event) => void handleSubmit(event)}
+              onStop={() => void stop()}
+              onSubmitText={(text) => void submitText(text)}
+              logoUrl={logoUrl}
+              inputPlaceholder="Ask a question..."
+              hideInlineProducts
+            />
+          </div>
+
+          {showSidePanel ? (
+            <aside className="dg-hero-side-panel">
+              <div className="dg-hero-panel-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={desktopPanelTab === "products"}
+                  className={`dg-hero-panel-tab${desktopPanelTab === "products" ? " dg-hero-panel-tab-active" : ""}`}
+                  onClick={() => setDesktopPanelTab("products")}
+                >
+                  Recommended
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={desktopPanelTab === "cart"}
+                  className={`dg-hero-panel-tab${desktopPanelTab === "cart" ? " dg-hero-panel-tab-active" : ""}`}
+                  onClick={() => {
+                    setDesktopPanelTab("cart");
+                    storeCart.refresh();
+                  }}
+                >
+                  Cart
+                  {storeCart.cart && storeCart.cart.items_count > 0 ? (
+                    <span className="dg-hero-panel-tab-badge">{storeCart.cart.items_count}</span>
+                  ) : null}
+                </button>
+              </div>
+
+              <div className="dg-hero-side-panel-body">
+                {desktopPanelTab === "products" ? (
+                  allProducts.length > 0 ? (
+                    <div className="dg-hero-panel-products">
+                      {allProducts.map((product) => (
+                        <ProductCardView key={product.id} product={product} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="dg-hero-panel-empty">
+                      <SparkleIcon size={22} />
+                      <p>Products the assistant finds will show up here as you chat.</p>
+                    </div>
+                  )
+                ) : (
+                  <CartReview
+                    cart={storeCart.cart}
+                    status={storeCart.status}
+                    error={storeCart.error}
+                    onRefresh={storeCart.refresh}
+                    onBack={() => setDesktopPanelTab("products")}
+                    onUpdateAddress={storeCart.updateShippingAddress}
+                    onSelectRate={storeCart.selectShippingRate}
+                    onRemoveItem={storeCart.decrementItem}
+                    embedded
+                  />
+                )}
+              </div>
+            </aside>
+          ) : null}
+        </div>
+      ) : isExpanded ? (
         <div className="dg-hero-expanded">
           {view === "cart" ? (
             <CartReview

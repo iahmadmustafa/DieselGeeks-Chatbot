@@ -158,6 +158,27 @@ export function CloseIcon({ className, size = 14 }: IconProps) {
   );
 }
 
+export function PlusIcon({ className, size = 14 }: IconProps) {
+  return (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 4v16M4 12h16" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function SparkleIcon({ className, size = 14 }: IconProps) {
+  return (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 3.5c.5 2.7 1 4.6 2.1 5.9 1.2 1.3 3.1 1.8 5.9 2.1-2.8.3-4.7.8-5.9 2.1-1.1 1.3-1.6 3.2-2.1 5.9-.5-2.7-1-4.6-2.1-5.9-1.2-1.3-3.1-1.8-5.9-2.1 2.8-.3 4.7-.8 5.9-2.1 1.1-1.3 1.6-3.2 2.1-5.9Z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function CheckIcon({ className, size = 14 }: IconProps) {
   return (
     <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">

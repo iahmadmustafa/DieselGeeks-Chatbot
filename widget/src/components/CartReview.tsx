@@ -21,6 +21,13 @@ interface CartReviewProps {
   onUpdateAddress: (address: Partial<StoreApiAddress>) => Promise<StoreCartMutationResult>;
   onSelectRate: (packageId: number | string, rateId: string) => Promise<StoreCartMutationResult>;
   onRemoveItem: (itemKey: string, currentQuantity: number) => Promise<StoreCartMutationResult>;
+  /**
+   * Desktop's 3-column layout (see HeroChat.tsx) shows this permanently in
+   * its own side panel next to the chat, rather than swapping it in to
+   * replace the conversation — "Back to chat" doesn't make sense there since
+   * chat is already visible right next to it.
+   */
+  embedded?: boolean;
 }
 
 /**
@@ -38,6 +45,7 @@ export function CartReview({
   onUpdateAddress,
   onSelectRate,
   onRemoveItem,
+  embedded = false,
 }: CartReviewProps) {
   const cartUrl = `${window.location.origin}/cart/`;
   const isEmpty = status === "ready" && (!cart || cart.items.length === 0);
@@ -93,7 +101,7 @@ export function CartReview({
             shopping with Diesel Geeks!
           </p>
           <button type="button" className="dg-btn dg-btn-primary" onClick={handleDone}>
-            Back to chat
+            {embedded ? "Done" : "Back to chat"}
           </button>
         </div>
       </div>
@@ -103,18 +111,22 @@ export function CartReview({
   return (
     <div className="dg-cart-view">
       <div className="dg-cart-view-toolbar">
-        <button type="button" className="dg-cart-back" onClick={onBack}>
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path
-              d="M10 3L5 8l5 5"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          Back to chat
-        </button>
+        {embedded ? (
+          <h4 className="dg-cart-embedded-title">Your cart</h4>
+        ) : (
+          <button type="button" className="dg-cart-back" onClick={onBack}>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M10 3L5 8l5 5"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Back to chat
+          </button>
+        )}
         <button type="button" className="dg-icon-btn" onClick={onRefresh} aria-label="Refresh cart">
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path

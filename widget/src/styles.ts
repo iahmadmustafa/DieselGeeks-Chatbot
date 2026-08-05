@@ -2279,6 +2279,272 @@ export const WIDGET_CSS = `
   box-shadow: none;
 }
 
+/*
+ * ---------- Desktop 3-column layout ----------
+ * ChatGPT-style: history sidebar (left) + chat (middle) + products/cart
+ * (right), all visible at once, side by side. Mobile/tablet never render
+ * this — see HeroChat.tsx's isDesktop gate — they keep the single-column
+ * full-bleed layout above (chat and cart fully replacing each other),
+ * since there's no room here for three columns to coexist. Overrides
+ * .dg-hero-expanded's flex column with a grid; everything else it already
+ * sets (background wash, animation, sizing) still applies to both.
+ */
+.dg-hero-3col {
+  display: grid;
+  grid-template-columns: 15.5rem minmax(0, 1fr) 24.5rem;
+  overflow: hidden;
+}
+
+/* No products or cart items yet — the chat column takes the freed-up width instead of leaving it empty. */
+.dg-hero-3col.dg-hero-3col-no-panel {
+  grid-template-columns: 15.5rem minmax(0, 1fr);
+}
+
+.dg-hero-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  min-height: 0;
+  padding: 1.4rem 1.1rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(9, 11, 14, 0.4);
+  backdrop-filter: blur(10px);
+  overflow-y: auto;
+}
+
+.dg-hero-new-chat-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--dg-radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--dg-text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--dg-dur-fast) ease, border-color var(--dg-dur-fast) ease,
+    transform var(--dg-dur-fast) ease;
+}
+
+.dg-hero-new-chat-btn:hover {
+  background: var(--dg-accent-soft);
+  border-color: var(--dg-accent);
+  color: var(--dg-accent-light);
+}
+
+.dg-hero-new-chat-btn:active {
+  transform: scale(0.97);
+}
+
+.dg-hero-sidebar-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: auto 0 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--dg-muted);
+}
+
+.dg-hero-sidebar-note svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--dg-accent);
+}
+
+.dg-hero-chat-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dg-hero-chat-col .dg-messages {
+  padding-top: 1.5rem;
+}
+
+.dg-hero-side-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: rgba(9, 11, 14, 0.4);
+  backdrop-filter: blur(10px);
+}
+
+.dg-hero-panel-tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 1rem 1rem 0;
+  flex-shrink: 0;
+}
+
+.dg-hero-panel-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--dg-radius-md) var(--dg-radius-md) 0 0;
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: transparent;
+  color: var(--dg-muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color var(--dg-dur-fast) ease, background var(--dg-dur-fast) ease;
+}
+
+.dg-hero-panel-tab:hover {
+  color: var(--dg-text);
+}
+
+.dg-hero-panel-tab-active {
+  color: var(--dg-text);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dg-hero-panel-tab-badge {
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.3rem;
+  border-radius: var(--dg-radius-full);
+  background: var(--dg-accent);
+  color: #06282a;
+  font-size: 0.62rem;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+
+.dg-hero-side-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1.1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dg-hero-panel-products {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.dg-hero-panel-empty {
+  height: 100%;
+  min-height: 12rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.7rem;
+  padding: 2rem 1rem;
+  color: var(--dg-muted);
+  font-size: 0.83rem;
+  line-height: 1.5;
+}
+
+.dg-hero-panel-empty svg {
+  color: var(--dg-accent);
+  opacity: 0.75;
+}
+
+.dg-hero-panel-empty p {
+  margin: 0;
+  max-width: 16rem;
+}
+
+/*
+ * Cart embedded in the side panel is a permanent fixture next to the chat
+ * (not a full-width takeover like the single-column mobile view above), so
+ * it drops the wide centered max-width and gets tighter spacing that fits a
+ * ~21rem-wide column instead. Comes after the .dg-hero-expanded cart rules
+ * above so it wins on cascade order at equal specificity.
+ */
+.dg-hero-side-panel .dg-cart-view-body {
+  max-width: none;
+  padding: 0;
+}
+
+.dg-hero-side-panel .dg-cart-view-toolbar {
+  max-width: none;
+  padding: 0 0 0.85rem;
+  margin-bottom: 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dg-cart-embedded-title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--dg-text);
+}
+
+.dg-hero-side-panel .dg-cart-view-footer {
+  max-width: none;
+  padding: 0.9rem 0 0;
+  margin-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dg-hero-side-panel .dg-order-confirmation {
+  max-width: none;
+  padding: 1.5rem 0.5rem;
+}
+
+/*
+ * Thin, dark, on-brand scrollbars for the desktop 3-column panes — the
+ * browser default (chunky, light-grey/white) stood out hard against this
+ * dark glass UI. Firefox gets its own shorthand (no ::-webkit-scrollbar
+ * support); Chromium/Safari get the pseudo-elements below.
+ */
+.dg-hero-sidebar,
+.dg-hero-side-panel-body,
+.dg-hero-chat-col .dg-messages {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.dg-hero-sidebar::-webkit-scrollbar,
+.dg-hero-side-panel-body::-webkit-scrollbar,
+.dg-hero-chat-col .dg-messages::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dg-hero-sidebar::-webkit-scrollbar-track,
+.dg-hero-side-panel-body::-webkit-scrollbar-track,
+.dg-hero-chat-col .dg-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dg-hero-sidebar::-webkit-scrollbar-thumb,
+.dg-hero-side-panel-body::-webkit-scrollbar-thumb,
+.dg-hero-chat-col .dg-messages::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.18);
+  border-radius: var(--dg-radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.dg-hero-sidebar::-webkit-scrollbar-thumb:hover,
+.dg-hero-side-panel-body::-webkit-scrollbar-thumb:hover,
+.dg-hero-chat-col .dg-messages::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(101, 210, 213, 0.45);
+  background-clip: padding-box;
+}
+
 /* ---------- Mobile ---------- */
 
 @media (max-width: 640px) {
