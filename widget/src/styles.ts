@@ -1872,14 +1872,20 @@ export const WIDGET_CSS = `
   height: min(88vh, 820px);
   /*
    * A flush 0 gap here meant scrolled-up message text visually ran straight
-   * into whatever sits above this section on the page (typically the site's
-   * sticky navbar) — there was no breathing room between "site chrome" and
-   * "widget content", so it read as a layout bug rather than two separate
-   * things stacked on a page. This margin is entirely self-contained (no
+   * into whatever sits above/below this section on the page (the site's
+   * sticky navbar above, the next section below) — there was no breathing
+   * room between "site chrome" and "widget content". A plain margin alone
+   * just turned that into a flat rectangle of bare page background sitting
+   * next to a hard-edged dark box, which read as an ugly stray bar rather
+   * than intentional spacing — rounding the corners and adding a soft drop
+   * shadow is what actually sells it as a deliberately separated card
+   * floating on the page, not a layout bug. Kept fully self-contained (no
    * assumption about Elementor section spacing), so it holds regardless of
    * how the surrounding page is built.
    */
-  margin-top: 1.25rem;
+  margin: 0.85rem 0;
+  border-radius: var(--dg-radius-xl);
+  box-shadow: 0 1.25rem 3rem rgba(0, 0, 0, 0.35);
   overflow: hidden;
   color: var(--dg-text);
   background-color: #05070a;
@@ -2456,6 +2462,16 @@ export const WIDGET_CSS = `
   overflow-y: auto;
   padding: 1.1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  /*
+   * Same dissolve-at-the-edges treatment as .dg-messages above, on both ends
+   * this time — the product list's last card was ending flush against the
+   * panel's bottom edge (right where the hero section itself ends and the
+   * next part of the page begins), which read just as badly as text hitting
+   * the top edge did. Masking both edges of this one scrollable element
+   * keeps it self-contained and free of any extra overlay layers.
+   */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.5rem, #000 calc(100% - 1.5rem), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 1.5rem, #000 calc(100% - 1.5rem), transparent 100%);
 }
 
 .dg-hero-panel-products {
@@ -2620,7 +2636,8 @@ export const WIDGET_CSS = `
 
   .dg-hero {
     height: min(90vh, 640px);
-    margin-top: 0.75rem;
+    margin: 0.5rem 0;
+    border-radius: var(--dg-radius-lg);
   }
 
   .dg-hero-idle {
