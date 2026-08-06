@@ -1,8 +1,29 @@
 import * as React from "react";
 
-const INLINE_PATTERN = /\*\*(.+?)\*\*|(https?:\/\/[^\s]+)/g;
+/**
+ * Inline markdown we support inside a line:
+ * - **bold**
+ * - [label](https://...)  (preferred — short link text)
+ * - bare https://... URLs (shown as a short label, never the full string)
+ */
+const INLINE_PATTERN = /\*\*(.+?)\*\*|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s]+)/g;
 
-/** Render **bold** spans and bare URLs as links within a single line of text. */
+function linkLabelForUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.pathname.includes("/product/")) {
+      return "View product";
+    }
+    if (parsed.pathname.includes("contact")) {
+      return "Contact us";
+    }
+    return parsed.hostname.replace(/^www\./, "");
+  } catch {
+    return "Open link";
+  }
+}
+
+/** Render **bold**, markdown links, and bare URLs within a single line of text. */
 function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -21,10 +42,28 @@ function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
 
     if (match[1] !== undefined) {
       nodes.push(<strong key={`${keyPrefix}-b-${idx++}`}>{match[1]}</strong>);
-    } else if (match[2] !== undefined) {
+    } else if (match[2] !== undefined && match[3] !== undefined) {
       nodes.push(
-        <a key={`${keyPrefix}-l-${idx++}`} href={match[2]} target="_blank" rel="noopener noreferrer">
+        <a
+          key={`${keyPrefix}-ml-${idx++}`}
+          className="dg-msg-link"
+          href={match[3]}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           {match[2]}
+        </a>,
+      );
+    } else if (match[4] !== undefined) {
+      nodes.push(
+        <a
+          key={`${keyPrefix}-l-${idx++}`}
+          className="dg-msg-link"
+          href={match[4]}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {linkLabelForUrl(match[4])}
         </a>,
       );
     }
@@ -40,39 +79,56 @@ function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
 }
 
 const BULLET_PATTERN = /^\s*[-*•]\s+(.*)$/;
+const NUMBERED_PATTERN = /^\s*(\d+)[.)]\s+(.*)$/;
 
 /**
- * Lightweight formatter for assistant replies: groups consecutive "- " lines
- * into a real list, bolds **text**, and linkifies bare URLs. Falls back to
- * plain wrapped text for anything else — no external markdown dependency.
+ * Lightweight formatter for assistant replies: groups consecutive bullet /
+ * numbered lines into real lists, bolds **text**, turns [label](url) and bare
+ * URLs into short links. No external markdown dependency.
  */
 export function renderMessageBody(text: string): React.ReactNode {
   const lines = text.split("\n");
   const blocks: React.ReactNode[] = [];
-  let listBuffer: string[] = [];
+  let listBuffer: { kind: "ul" | "ol"; items: string[] } | null = null;
   let blockIndex = 0;
   let previousWasBlank = true;
 
   function flushList(): void {
-    if (listBuffer.length === 0) {
+    if (!listBuffer || listBuffer.items.length === 0) {
+      listBuffer = null;
       return;
     }
-    const items = listBuffer;
-    listBuffer = [];
+    const { kind, items } = listBuffer;
+    listBuffer = null;
+    const ListTag = kind === "ol" ? "ol" : "ul";
     blocks.push(
-      <ul className="dg-msg-list" key={`list-${blockIndex++}`}>
+      <ListTag className={`dg-msg-list${kind === "ol" ? " dg-msg-list-ordered" : ""}`} key={`list-${blockIndex++}`}>
         {items.map((item, itemIndex) => (
           <li key={itemIndex}>{renderInline(item, `li-${blockIndex}-${itemIndex}`)}</li>
         ))}
-      </ul>,
+      </ListTag>,
     );
+  }
+
+  function pushListItem(kind: "ul" | "ol", item: string): void {
+    if (!listBuffer || listBuffer.kind !== kind) {
+      flushList();
+      listBuffer = { kind, items: [] };
+    }
+    listBuffer.items.push(item);
+    previousWasBlank = false;
   }
 
   for (const line of lines) {
     const bulletMatch = line.match(BULLET_PATTERN);
     if (bulletMatch) {
-      listBuffer.push(bulletMatch[1]);
-      previousWasBlank = false;
+      pushListItem("ul", bulletMatch[1]);
+      continue;
+    }
+
+    const numberedMatch = line.match(NUMBERED_PATTERN);
+    if (numberedMatch) {
+      pushListItem("ol", numberedMatch[2]);
       continue;
     }
 
@@ -96,5 +152,5 @@ export function renderMessageBody(text: string): React.ReactNode {
 
   flushList();
 
-  return blocks;
+  return <div className="dg-msg-body">{blocks}</div>;
 }

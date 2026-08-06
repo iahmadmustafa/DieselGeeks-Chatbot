@@ -1340,29 +1340,55 @@ export const WIDGET_CSS = `
   color: #05282a;
 }
 
+.dg-msg-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
 .dg-msg-line {
   margin: 0;
+  line-height: 1.5;
   white-space: pre-wrap;
 }
 
-.dg-msg-line + .dg-msg-line {
-  margin-top: 0.3rem;
-}
-
 .dg-msg-spacer {
-  height: 0.5rem;
+  height: 0.2rem;
 }
 
 .dg-msg-list {
-  margin: 0.15rem 0;
-  padding-left: 1.1rem;
+  margin: 0.1rem 0 0.15rem;
+  padding-left: 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.4rem;
+  line-height: 1.45;
+}
+
+.dg-msg-list-ordered {
+  list-style: decimal;
 }
 
 .dg-msg-list li {
   white-space: pre-wrap;
+  padding-left: 0.15rem;
+}
+
+.dg-msg-body strong {
+  color: var(--dg-text);
+  font-weight: 700;
+}
+
+.dg-msg-link {
+  color: var(--dg-accent-light);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: normal;
+}
+
+.dg-msg-link:hover {
+  color: var(--dg-accent);
 }
 
 .dg-cursor {
