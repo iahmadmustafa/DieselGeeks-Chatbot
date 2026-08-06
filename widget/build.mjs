@@ -1,6 +1,6 @@
 import * as esbuild from "esbuild";
 import { constants } from "node:fs";
-import { access, copyFile, mkdir, stat } from "node:fs/promises";
+import { access, copyFile, mkdir, stat, unlink } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,7 +11,8 @@ const outfile = resolve(rootDir, "public", "dieselgeeks-chat.js");
 const logoSource = resolve(__dirname, "src", "assets", "logo.png");
 const logoOutput = resolve(rootDir, "public", "dr-diesel-logo.png");
 const heroBgSource = resolve(rootDir, "src", "assests", "background.png");
-const heroBgOutput = resolve(rootDir, "public", "dg-hero-bg.png");
+const heroBgOutput = resolve(rootDir, "public", "dg-hero-bg.jpg");
+const heroBgLegacyPng = resolve(rootDir, "public", "dg-hero-bg.png");
 
 async function fileExists(path) {
   try {
@@ -114,12 +115,53 @@ async function prepareLogo() {
 }
 
 /**
- * Photo behind HeroChat's idle/expanded views (see styles.ts .dg-hero). Just
- * a straight copy into public/ — unlike the logo there's no fixed target
- * size (it's a full-bleed cover image at whatever the hero section's
- * dimensions end up being), so no resize step. Missing source/output is
- * non-fatal: HeroChat degrades to its CSS-only gradient background.
+ * Compress the hero photo into a ~1920px-wide JPEG. The raw PNG was ~1.5MB
+ * and, with any glass UI on top, kept the GPU busy during hover/click.
+ * Missing source/output is non-fatal: HeroChat falls back to CSS gradients.
  */
+function tryOptimizeHeroBackgroundWindows() {
+  const script = `
+$ErrorActionPreference = 'Stop'
+try {
+  Add-Type -AssemblyName System.Drawing
+  $img = [System.Drawing.Image]::FromFile('${heroBgSource.replace(/\\/g, "\\\\")}')
+  $maxW = 1920
+  $w = $img.Width
+  $h = $img.Height
+  if ($w -gt $maxW) {
+    $h = [int]([math]::Round($h * ($maxW / [double]$w)))
+    $w = $maxW
+  }
+  $bmp = New-Object System.Drawing.Bitmap $w, $h
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+  $g.DrawImage($img, 0, 0, $w, $h)
+  $codec = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object { $_.MimeType -eq 'image/jpeg' }
+  $params = New-Object System.Drawing.Imaging.EncoderParameters 1
+  $params.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter ([System.Drawing.Imaging.Encoder]::Quality, 72L)
+  $bmp.Save('${heroBgOutput.replace(/\\/g, "\\\\")}', $codec, $params)
+  $img.Dispose(); $bmp.Dispose(); $g.Dispose(); $params.Dispose()
+} catch {
+  Write-Error $_.Exception.Message
+  exit 1
+}
+`;
+
+  const result = spawnSync("powershell", ["-NoProfile", "-Command", script], {
+    encoding: "utf8",
+  });
+
+  if (result.status !== 0) {
+    const details = [result.stderr, result.stdout, result.error?.message]
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+    return { ok: false, details: details || `powershell exited with code ${result.status}` };
+  }
+
+  return { ok: true };
+}
+
 async function prepareHeroBackground() {
   await mkdir(dirname(heroBgOutput), { recursive: true });
 
@@ -136,9 +178,38 @@ async function prepareHeroBackground() {
     return;
   }
 
+  const sourceStat = await stat(heroBgSource);
+  console.log(`[build:widget] Hero background source: ${heroBgSource} (${sourceStat.size} bytes)`);
+
+  if (process.platform === "win32") {
+    console.log("[build:widget] Compressing hero background to JPEG (max 1920px, q72)...");
+    const result = tryOptimizeHeroBackgroundWindows();
+    if (result.ok) {
+      const outputStat = await stat(heroBgOutput);
+      console.log(`[build:widget] Hero background optimized -> ${heroBgOutput} (${outputStat.size} bytes)`);
+      // Drop the old PNG so we don't keep shipping a 1.5MB unused asset.
+      if (await fileExists(heroBgLegacyPng)) {
+        await unlink(heroBgLegacyPng);
+        console.log(`[build:widget] Removed legacy ${heroBgLegacyPng}`);
+      }
+      return;
+    }
+    console.warn("[build:widget] Hero JPEG optimization failed (non-fatal):", result.details);
+  }
+
+  // Non-Windows / failed optimize: still avoid shipping the raw multi‑MB PNG
+  // as .jpg with a wrong format — copy only if we have no better output yet.
+  if (await fileExists(heroBgOutput)) {
+    const outputStat = await stat(heroBgOutput);
+    console.log(`[build:widget] Using existing hero background at ${heroBgOutput} (${outputStat.size} bytes)`);
+    return;
+  }
+
   await copyFile(heroBgSource, heroBgOutput);
   const outputStat = await stat(heroBgOutput);
-  console.log(`[build:widget] Hero background copied -> ${heroBgOutput} (${outputStat.size} bytes)`);
+  console.warn(
+    `[build:widget] Raw hero background copied to ${heroBgOutput} (${outputStat.size} bytes). Optimize to JPEG for production.`,
+  );
 }
 
 await mkdir(dirname(outfile), { recursive: true });

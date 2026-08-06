@@ -346,11 +346,11 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
 
   // Built from apiBase (per-site, like logoUrl) rather than baked into
   // styles.ts, since the CSS bundle has no way to know which site's origin
-  // to point at. See build.mjs (copies src/assests/background.png into
-  // public/dg-hero-bg.png) and styles.ts's .dg-hero / .dg-hero::before for
+  // to point at. See build.mjs (compresses src/assests/background.png into
+  // public/dg-hero-bg.jpg) and styles.ts's .dg-hero / .dg-hero::before for
   // the fallback color + legibility overlay this photo sits under.
   const heroBackgroundStyle: React.CSSProperties = {
-    backgroundImage: `url(${apiBase}/dg-hero-bg.png)`,
+    backgroundImage: `url(${apiBase}/dg-hero-bg.jpg)`,
     backgroundSize: "cover",
     backgroundPosition: "center",
   };

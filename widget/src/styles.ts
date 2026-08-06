@@ -605,8 +605,9 @@ export const WIDGET_CSS = `
   position: fixed;
   inset: 0;
   z-index: 2147483005;
-  background: rgba(6, 8, 11, 0.72);
-  backdrop-filter: blur(4px);
+  /* Solid dim only — live backdrop-filter over the hero photo is a major
+   * compositor cost and made sign-in feel stuck/laggy on hover/click. */
+  background: rgba(6, 8, 11, 0.78);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1070,8 +1071,7 @@ export const WIDGET_CSS = `
   position: fixed;
   inset: 0;
   z-index: 2147483009;
-  background: rgba(8, 10, 14, 0.72);
-  backdrop-filter: blur(2px);
+  background: rgba(8, 10, 14, 0.78);
 }
 
 .dg-payment-submit {
@@ -1909,7 +1909,7 @@ export const WIDGET_CSS = `
  * it — bounded to a fixed height so an expanding conversation scrolls inside
  * itself instead of growing the page, per the "only in that section" brief.
  *
- * The actual photo (public/dg-hero-bg.png, built from src/assests/background.png)
+ * The actual photo (public/dg-hero-bg.jpg, built from src/assests/background.png)
  * is set as an inline style from HeroChat.tsx, since it needs the per-site
  * apiBase to build its URL — this file only supplies the dark fallback color
  * (shown before the photo loads / if it's ever missing) plus the ::before
@@ -2073,10 +2073,9 @@ export const WIDGET_CSS = `
   max-width: 34rem;
   padding: 0.4rem 0.4rem 0.4rem 1rem;
   border-radius: var(--dg-radius-full);
-  background: rgba(13, 16, 19, 0.82);
+  background: rgba(13, 16, 19, 0.9);
   border: 1px solid var(--dg-border-strong);
   box-shadow: var(--dg-shadow-md);
-  backdrop-filter: blur(10px);
   transform: scale(0.96);
   transform-origin: center;
   transition: transform var(--dg-dur-slow) var(--dg-ease-spring), padding var(--dg-dur-base) var(--dg-ease-out),
@@ -2132,23 +2131,20 @@ export const WIDGET_CSS = `
   align-items: center;
   gap: 0.42rem;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(13, 16, 19, 0.55);
+  background: rgba(13, 16, 19, 0.82);
   color: var(--dg-text-secondary);
   border-radius: var(--dg-radius-full);
   padding: 0.5rem 0.95rem;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
-  backdrop-filter: blur(6px);
-  transition: border-color var(--dg-dur-fast) ease, color var(--dg-dur-fast) ease, background var(--dg-dur-fast) ease,
-    transform var(--dg-dur-fast) ease, box-shadow var(--dg-dur-fast) ease;
+  transition: border-color var(--dg-dur-fast) ease, color var(--dg-dur-fast) ease, background var(--dg-dur-fast) ease;
 }
 
 .dg-hero-pill:hover {
   border-color: var(--dg-accent);
   color: var(--dg-accent-light);
-  background: rgba(101, 210, 213, 0.1);
-  transform: translateY(-1px);
+  background: rgba(101, 210, 213, 0.14);
 }
 
 .dg-hero-pill:focus-visible {
@@ -2191,9 +2187,8 @@ export const WIDGET_CSS = `
 
 .dg-hero-cart-btn,
 .dg-hero-close-btn {
-  background: rgba(13, 16, 19, 0.65);
+  background: rgba(13, 16, 19, 0.88);
   border-color: rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(6px);
 }
 
 .dg-hero-cart-btn:focus-visible,
@@ -2229,8 +2224,9 @@ export const WIDGET_CSS = `
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background: rgba(6, 8, 11, 0.2);
-  backdrop-filter: blur(3px);
+  /* Opaque-enough wash instead of backdrop-filter — nested live blurs over
+   * the hero photo were the main cause of laggy hover/click. */
+  background: rgba(6, 8, 11, 0.42);
   animation: dg-hero-expand var(--dg-dur-slow) var(--dg-ease-out);
 }
 
@@ -2306,8 +2302,7 @@ export const WIDGET_CSS = `
 .dg-hero-expanded .dg-cart-shipping,
 .dg-hero-expanded .dg-cart-summary,
 .dg-hero-expanded .dg-payment-step {
-  background: rgba(18, 21, 26, 0.72);
-  backdrop-filter: blur(14px);
+  background: rgba(18, 21, 26, 0.92);
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: var(--dg-shadow-sm);
 }
@@ -2350,9 +2345,8 @@ export const WIDGET_CSS = `
   margin: 0 auto 1.25rem;
   border-radius: var(--dg-radius-xl);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(18, 21, 26, 0.68);
+  background: rgba(18, 21, 26, 0.92);
   box-shadow: var(--dg-shadow-md);
-  backdrop-filter: blur(14px);
 }
 
 /*
@@ -2396,8 +2390,7 @@ export const WIDGET_CSS = `
   min-height: 0;
   padding: 1.4rem 1.1rem;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(9, 11, 14, 0.4);
-  backdrop-filter: blur(10px);
+  background: rgba(9, 11, 14, 0.78);
   overflow-y: auto;
 }
 
@@ -2691,8 +2684,7 @@ export const WIDGET_CSS = `
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: rgba(9, 11, 14, 0.4);
-  backdrop-filter: blur(10px);
+  background: rgba(9, 11, 14, 0.78);
 }
 
 .dg-hero-panel-tabs {
