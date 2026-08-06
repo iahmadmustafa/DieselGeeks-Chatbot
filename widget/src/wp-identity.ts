@@ -1,10 +1,8 @@
 /**
  * Bridges the WordPress site's own login session into the widget — see
- * wordpress/dieselgeeks-chat-identity.php for the PHP side that issues the
- * token this reads / handles in-widget password login. The widget never
- * invents a separate auth system; email/password goes through wp_signon on
- * the WordPress site, and Google Sign-In reuses Site Kit on My Account
- * inside a small popup.
+ * wordpress/dieselgeeks-chat-identity.php. Email/password uses wp_signon;
+ * Google uses Google Identity Services on this page (same Client ID as Site
+ * Kit) and a WP AJAX verifier — never navigates to /my-account/.
  */
 
 export interface WpIdentityResult {
@@ -17,10 +15,37 @@ export interface WpIdentityResult {
 interface DieselgeeksChatIdentityConfig {
   ajaxUrl: string;
   nonce: string;
-  myAccountUrl?: string;
+  googleClientId?: string;
+}
+
+interface GoogleCredentialResponse {
+  credential?: string;
+}
+
+interface GoogleAccountsId {
+  initialize: (config: {
+    client_id: string;
+    callback: (response: GoogleCredentialResponse) => void;
+    auto_select?: boolean;
+    cancel_on_tap_outside?: boolean;
+    context?: string;
+    ux_mode?: "popup" | "redirect";
+  }) => void;
+  prompt: (momentListener?: (notification: { isNotDisplayed: () => boolean; isSkippedMoment: () => boolean; isDismissedMoment: () => boolean }) => void) => void;
+  renderButton: (
+    parent: HTMLElement,
+    options: { type?: string; theme?: string; size?: string; text?: string; shape?: string; width?: number },
+  ) => void;
+}
+
+declare global {
+  interface Window {
+    google?: { accounts?: { id?: GoogleAccountsId } };
+  }
 }
 
 const LOGGED_OUT_RESULT: WpIdentityResult = { loggedIn: false, token: null, displayName: null };
+const GSI_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
 
 function getIdentityConfig(): DieselgeeksChatIdentityConfig | null {
   const config = (window as Window & { DIESELGEEKS_CHAT_IDENTITY?: DieselgeeksChatIdentityConfig })
@@ -44,20 +69,12 @@ function parseIdentityResponse(data: Partial<WpIdentityResult> & { loggedIn?: bo
 }
 
 let cachedResultPromise: Promise<WpIdentityResult> | null = null;
+let gsiScriptPromise: Promise<GoogleAccountsId> | null = null;
 
-/**
- * Drops the cached identity so the next getWpIdentity() hits WordPress
- * again — required after a successful in-widget login (or Google popup),
- * since the page-load cache would otherwise keep reporting "logged out".
- */
 export function clearWpIdentityCache(): void {
   cachedResultPromise = null;
 }
 
-/**
- * Fetches (and caches for the page's lifetime) the current visitor's WP
- * identity. Fails closed to "logged out" on any error rather than throwing.
- */
 export function getWpIdentity(): Promise<WpIdentityResult> {
   if (cachedResultPromise) {
     return cachedResultPromise;
@@ -98,11 +115,6 @@ export type WpLoginResult =
   | { ok: true; identity: WpIdentityResult }
   | { ok: false; error: string };
 
-/**
- * Email/password login against the WordPress site's real accounts
- * (admin-ajax → wp_signon). Stays on the current page — no /my-account/
- * redirect. On success, refreshes the identity cache.
- */
 export async function loginWithPassword(options: {
   username: string;
   password: string;
@@ -154,13 +166,52 @@ export async function loginWithPassword(options: {
   }
 }
 
+function loadGoogleIdentityServices(): Promise<GoogleAccountsId> {
+  if (window.google?.accounts?.id) {
+    return Promise.resolve(window.google.accounts.id);
+  }
+
+  if (gsiScriptPromise) {
+    return gsiScriptPromise;
+  }
+
+  gsiScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${GSI_SCRIPT_SRC}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => {
+        if (window.google?.accounts?.id) {
+          resolve(window.google.accounts.id);
+        } else {
+          reject(new Error("Google Identity Services failed to initialize."));
+        }
+      });
+      existing.addEventListener("error", () => reject(new Error("Could not load Google Sign-In.")));
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = GSI_SCRIPT_SRC;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      if (window.google?.accounts?.id) {
+        resolve(window.google.accounts.id);
+      } else {
+        reject(new Error("Google Identity Services failed to initialize."));
+      }
+    };
+    script.onerror = () => reject(new Error("Could not load Google Sign-In."));
+    document.head.appendChild(script);
+  });
+
+  return gsiScriptPromise;
+}
+
 /**
- * Opens My Account in a small popup so Site Kit's Google button (and the
- * normal WP login form) can run there, then polls our identity endpoint
- * until the visitor is logged in or the popup closes. Keeps the chat page
- * underneath untouched.
+ * Exchanges a Google Identity Services ID token for a WordPress session via
+ * our AJAX bridge (same accounts Site Kit would create/log into).
  */
-export async function loginWithGooglePopup(): Promise<WpLoginResult> {
+export async function loginWithGoogleCredential(credential: string): Promise<WpLoginResult> {
   const config = getIdentityConfig();
   if (!config) {
     return {
@@ -169,65 +220,132 @@ export async function loginWithGooglePopup(): Promise<WpLoginResult> {
     };
   }
 
-  const accountUrl = config.myAccountUrl || `${window.location.origin}/my-account/`;
-  const width = 480;
-  const height = 720;
-  const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
-  const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
+  try {
+    const body = new URLSearchParams();
+    body.set("action", "dieselgeeks_chat_google_login");
+    body.set("nonce", config.nonce);
+    body.set("credential", credential);
 
-  const popup = window.open(
-    accountUrl,
-    "dg-wp-login",
-    `popup=yes,width=${width},height=${height},left=${left},top=${top}`,
-  );
+    const response = await fetch(config.ajaxUrl, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+      body: body.toString(),
+    });
 
-  if (!popup) {
+    const data = (await response.json().catch(() => ({}))) as Partial<WpIdentityResult> & {
+      loggedIn?: boolean;
+      error?: string;
+    };
+
+    if (!response.ok || !data.loggedIn) {
+      return {
+        ok: false,
+        error: typeof data.error === "string" ? data.error : "Google sign-in failed. Please try again.",
+      };
+    }
+
+    const identity = parseIdentityResponse(data);
+    clearWpIdentityCache();
+    cachedResultPromise = Promise.resolve(identity);
+    return { ok: true, identity };
+  } catch {
+    return { ok: false, error: "Network error — please check your connection and try again." };
+  }
+}
+
+/**
+ * Opens Google's own account chooser (GIS) on this page — not My Account.
+ * GIS buttons don't work reliably inside Shadow DOM, so we render Google's
+ * button into a temporary light-DOM host and click it, which triggers the
+ * normal Google popup over the chat page.
+ */
+export async function loginWithGoogle(): Promise<WpLoginResult> {
+  const config = getIdentityConfig();
+  if (!config?.googleClientId) {
     return {
       ok: false,
-      error: "Popup blocked — please allow popups for this site, or sign in with email and password.",
+      error: "Google sign-in isn’t configured on this site yet.",
     };
+  }
+
+  let googleId: GoogleAccountsId;
+  try {
+    googleId = await loadGoogleIdentityServices();
+  } catch {
+    return { ok: false, error: "Could not load Google Sign-In. Please try again." };
   }
 
   return new Promise((resolve) => {
     let settled = false;
-
     const finish = (result: WpLoginResult) => {
       if (settled) {
         return;
       }
       settled = true;
-      window.clearInterval(pollId);
-      window.clearInterval(closedId);
-      try {
-        popup.close();
-      } catch {
-        // Ignore — popup may already be closed or cross-origin.
-      }
+      host.remove();
       resolve(result);
     };
 
-    const pollId = window.setInterval(() => {
-      void (async () => {
-        clearWpIdentityCache();
-        const identity = await getWpIdentity();
-        if (identity.loggedIn) {
-          finish({ ok: true, identity });
-        }
-      })();
-    }, 900);
+    // Light DOM only — Google Identity Services cannot mount inside Shadow DOM.
+    const host = document.createElement("div");
+    host.setAttribute("aria-hidden", "true");
+    host.style.cssText = "position:fixed;left:-9999px;top:0;width:240px;height:44px;overflow:hidden;";
+    document.body.appendChild(host);
 
-    const closedId = window.setInterval(() => {
-      if (popup.closed) {
+    googleId.initialize({
+      client_id: config.googleClientId!,
+      ux_mode: "popup",
+      auto_select: false,
+      cancel_on_tap_outside: true,
+      context: "signin",
+      callback: (response) => {
         void (async () => {
-          clearWpIdentityCache();
-          const identity = await getWpIdentity();
-          if (identity.loggedIn) {
-            finish({ ok: true, identity });
+          if (!response.credential) {
+            finish({ ok: false, error: "Google sign-in was cancelled." });
             return;
           }
-          finish({ ok: false, error: "Sign-in window was closed before finishing." });
+          finish(await loginWithGoogleCredential(response.credential));
         })();
+      },
+    });
+
+    googleId.renderButton(host, {
+      type: "standard",
+      theme: "outline",
+      size: "large",
+      text: "continue_with",
+      shape: "rectangular",
+      width: 240,
+    });
+
+    window.setTimeout(() => {
+      const button =
+        host.querySelector<HTMLElement>('div[role="button"]') ??
+        host.querySelector<HTMLElement>("div[tabindex='0']") ??
+        host.querySelector<HTMLElement>("iframe");
+
+      if (!button) {
+        // One Tap / prompt as a fallback when renderButton markup differs.
+        googleId.prompt((notification) => {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment() || notification.isDismissedMoment()) {
+            finish({
+              ok: false,
+              error: "Google sign-in didn’t open. Please allow popups and try again.",
+            });
+          }
+        });
+        return;
       }
-    }, 400);
+
+      button.click();
+    }, 80);
+
+    // If the user dismisses Google's UI without a credential callback.
+    window.setTimeout(() => {
+      if (!settled) {
+        finish({ ok: false, error: "Google sign-in timed out or was cancelled." });
+      }
+    }, 120_000);
   });
 }

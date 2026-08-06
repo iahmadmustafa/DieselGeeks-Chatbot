@@ -1,7 +1,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 
-import { loginWithGooglePopup, loginWithPassword, type WpIdentityResult } from "../wp-identity";
+import { loginWithGoogle, loginWithPassword, type WpIdentityResult } from "../wp-identity";
 import { CloseIcon } from "./Icons";
 
 type SubmitStatus = "idle" | "submitting" | "google";
@@ -12,10 +12,9 @@ interface LoginModalProps {
 }
 
 /**
- * In-widget WordPress login — password goes through our AJAX wp_signon
- * bridge (see dieselgeeks-chat-identity.php); Google opens My Account in a
- * small popup so Site Kit's existing button can run, then we sync identity
- * back without navigating the chat page away.
+ * In-widget WordPress login. Password → wp_signon AJAX. Google → Google
+ * Identity Services on this page (same Client ID as Site Kit) + WP token
+ * verify — stays on the chat; never redirects to /my-account/.
  */
 export function LoginModal({ onClose, onSuccess }: LoginModalProps) {
   const [username, setUsername] = React.useState("");
@@ -83,7 +82,7 @@ export function LoginModal({ onClose, onSuccess }: LoginModalProps) {
     setStatus("google");
     setError(null);
 
-    const result = await loginWithGooglePopup();
+    const result = await loginWithGoogle();
 
     if (!result.ok) {
       setStatus("idle");
@@ -130,7 +129,7 @@ export function LoginModal({ onClose, onSuccess }: LoginModalProps) {
           {status === "google" ? (
             <>
               <span className="dg-spinner" aria-hidden="true" />
-              Waiting for Google…
+              Connecting to Google…
             </>
           ) : (
             <>
@@ -181,11 +180,7 @@ export function LoginModal({ onClose, onSuccess }: LoginModalProps) {
 
           {error ? <p className="dg-cart-shipping-error">{error}</p> : null}
 
-          <button
-            type="submit"
-            className="dg-btn dg-btn-primary dg-modal-submit"
-            disabled={!canSubmit}
-          >
+          <button type="submit" className="dg-btn dg-btn-primary dg-modal-submit" disabled={!canSubmit}>
             {status === "submitting" ? (
               <>
                 <span className="dg-spinner" aria-hidden="true" />
