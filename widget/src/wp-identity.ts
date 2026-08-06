@@ -32,6 +32,7 @@ interface GoogleAccountsId {
     ux_mode?: "popup" | "redirect";
   }) => void;
   prompt: (momentListener?: (notification: { isNotDisplayed: () => boolean; isSkippedMoment: () => boolean; isDismissedMoment: () => boolean }) => void) => void;
+  cancel: () => void;
   renderButton: (
     parent: HTMLElement,
     options: { type?: string; theme?: string; size?: string; text?: string; shape?: string; width?: number },
@@ -259,14 +260,23 @@ export async function loginWithGoogleCredential(credential: string): Promise<WpL
  * GIS buttons don't work reliably inside Shadow DOM, so we render Google's
  * button into a temporary light-DOM host and click it, which triggers the
  * normal Google popup over the chat page.
+ *
+ * Pass an AbortSignal (from the login modal close button) so cancelling /
+ * closing the modal doesn't leave the UI stuck on "Connecting to Google…".
+ * GIS often does not call back when the user closes the Google window — we
+ * also treat "window blurred then focused again without a credential" as cancel.
  */
-export async function loginWithGoogle(): Promise<WpLoginResult> {
+export async function loginWithGoogle(options?: { signal?: AbortSignal }): Promise<WpLoginResult> {
   const config = getIdentityConfig();
   if (!config?.googleClientId) {
     return {
       ok: false,
       error: "Google sign-in isn’t configured on this site yet.",
     };
+  }
+
+  if (options?.signal?.aborted) {
+    return { ok: false, error: "Google sign-in was cancelled." };
   }
 
   let googleId: GoogleAccountsId;
@@ -278,20 +288,74 @@ export async function loginWithGoogle(): Promise<WpLoginResult> {
 
   return new Promise((resolve) => {
     let settled = false;
-    const finish = (result: WpLoginResult) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      host.remove();
-      resolve(result);
-    };
+    let sawBlur = false;
+    let focusTimer: number | null = null;
+    let timeoutId: number | null = null;
 
     // Light DOM only — Google Identity Services cannot mount inside Shadow DOM.
     const host = document.createElement("div");
     host.setAttribute("aria-hidden", "true");
     host.style.cssText = "position:fixed;left:-9999px;top:0;width:240px;height:44px;overflow:hidden;";
     document.body.appendChild(host);
+
+    const cleanup = () => {
+      if (focusTimer !== null) {
+        window.clearTimeout(focusTimer);
+      }
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", onFocus);
+      options?.signal?.removeEventListener("abort", onAbort);
+      try {
+        googleId.cancel();
+      } catch {
+        // GIS may throw if nothing is prompting — safe to ignore.
+      }
+      host.remove();
+    };
+
+    const finish = (result: WpLoginResult) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      resolve(result);
+    };
+
+    const onAbort = () => {
+      finish({ ok: false, error: "Google sign-in was cancelled." });
+    };
+
+    const onBlur = () => {
+      sawBlur = true;
+    };
+
+    /*
+     * When the Google popup/account UI closes, focus usually returns to this
+     * tab without GIS invoking the credential callback — that's what left
+     * the modal spinning forever. Wait a beat after focus so a successful
+     * credential callback (which often races with focus) can win first.
+     */
+    const onFocus = () => {
+      if (!sawBlur || settled) {
+        return;
+      }
+      if (focusTimer !== null) {
+        window.clearTimeout(focusTimer);
+      }
+      focusTimer = window.setTimeout(() => {
+        if (!settled) {
+          finish({ ok: false, error: "Google sign-in was cancelled." });
+        }
+      }, 700);
+    };
+
+    options?.signal?.addEventListener("abort", onAbort);
+    window.addEventListener("blur", onBlur);
+    window.addEventListener("focus", onFocus);
 
     googleId.initialize({
       client_id: config.googleClientId!,
@@ -304,6 +368,12 @@ export async function loginWithGoogle(): Promise<WpLoginResult> {
           if (!response.credential) {
             finish({ ok: false, error: "Google sign-in was cancelled." });
             return;
+          }
+          // Successful credential — don't treat the upcoming focus event as cancel.
+          sawBlur = false;
+          if (focusTimer !== null) {
+            window.clearTimeout(focusTimer);
+            focusTimer = null;
           }
           finish(await loginWithGoogleCredential(response.credential));
         })();
@@ -320,20 +390,21 @@ export async function loginWithGoogle(): Promise<WpLoginResult> {
     });
 
     window.setTimeout(() => {
+      if (settled) {
+        return;
+      }
+
       const button =
         host.querySelector<HTMLElement>('div[role="button"]') ??
-        host.querySelector<HTMLElement>("div[tabindex='0']") ??
-        host.querySelector<HTMLElement>("iframe");
+        host.querySelector<HTMLElement>("div[tabindex='0']");
 
       if (!button) {
-        // One Tap / prompt as a fallback when renderButton markup differs.
-        googleId.prompt((notification) => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment() || notification.isDismissedMoment()) {
-            finish({
-              ok: false,
-              error: "Google sign-in didn’t open. Please allow popups and try again.",
-            });
-          }
+        // Avoid googleId.prompt() — Site Kit may already own One Tap on this
+        // page, and prompting again is what produced duplicate "Sign in as …"
+        // chips stacked on the storefront login UI.
+        finish({
+          ok: false,
+          error: "Google sign-in didn’t open. Please allow popups and try again.",
         });
         return;
       }
@@ -341,11 +412,10 @@ export async function loginWithGoogle(): Promise<WpLoginResult> {
       button.click();
     }, 80);
 
-    // If the user dismisses Google's UI without a credential callback.
-    window.setTimeout(() => {
+    timeoutId = window.setTimeout(() => {
       if (!settled) {
         finish({ ok: false, error: "Google sign-in timed out or was cancelled." });
       }
-    }, 120_000);
+    }, 60_000);
   });
 }

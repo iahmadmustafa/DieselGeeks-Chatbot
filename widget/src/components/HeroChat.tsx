@@ -136,19 +136,26 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
   function handleLoginSuccess(identity: WpIdentityResult): void {
     setWpIdentity(identity);
     setShowLoginModal(false);
-    // Guest chat sitting in this browser gets lifted into the account
-    // immediately so nothing is lost the first time they sign in.
+
+    // AJAX login sets WP cookies but the theme header still says "Login"
+    // until the page re-renders. After migrating any guest chat, reload so
+    // the storefront (and chat) both show the logged-in state.
+    const reload = () => {
+      window.location.reload();
+    };
+
     if (identity.token && messages.length > 0) {
       void saveConversation({
         token: identity.token,
         conversationId: sessionId,
         messages,
       })
-        .then(() => refreshHistory(identity.token!))
-        .catch(() => void refreshHistory(identity.token!));
-    } else if (identity.token) {
-      void refreshHistory(identity.token);
+        .then(reload)
+        .catch(reload);
+      return;
     }
+
+    reload();
   }
 
   const [input, setInput] = React.useState("");

@@ -24,6 +24,7 @@ export function LoginModal({ onClose, onSuccess }: LoginModalProps) {
   const [error, setError] = React.useState<string | null>(null);
   const markerRef = React.useRef<HTMLSpanElement | null>(null);
   const [portalTarget, setPortalTarget] = React.useState<Element | null>(null);
+  const googleAbortRef = React.useRef<AbortController | null>(null);
 
   React.useEffect(() => {
     const marker = markerRef.current;
@@ -39,16 +40,34 @@ export function LoginModal({ onClose, onSuccess }: LoginModalProps) {
   }, []);
 
   React.useEffect(() => {
+    return () => {
+      googleAbortRef.current?.abort();
+    };
+  }, []);
+
+  function requestClose(): void {
+    // Always allow closing — including mid Google flow. Aborting unsticks
+    // "Connecting to Google…" when the user dismisses Google's window/UI.
+    googleAbortRef.current?.abort();
+    googleAbortRef.current = null;
+    setStatus("idle");
+    onClose();
+  }
+
+  React.useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
-      if (event.key === "Escape" && status === "idle") {
-        onClose();
+      if (event.key === "Escape") {
+        requestClose();
       }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, status]);
+    // requestClose closes over latest onClose/status setters — rebind each render is fine.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onClose]);
 
-  const canSubmit = username.trim().length > 0 && password.length > 0 && status === "idle";
+  const busy = status !== "idle";
+  const canSubmit = username.trim().length > 0 && password.length > 0 && !busy;
 
   async function handlePasswordSubmit(event: React.FormEvent): Promise<void> {
     event.preventDefault();
@@ -79,14 +98,26 @@ export function LoginModal({ onClose, onSuccess }: LoginModalProps) {
       return;
     }
 
+    googleAbortRef.current?.abort();
+    const controller = new AbortController();
+    googleAbortRef.current = controller;
+
     setStatus("google");
     setError(null);
 
-    const result = await loginWithGoogle();
+    const result = await loginWithGoogle({ signal: controller.signal });
+
+    if (controller.signal.aborted) {
+      setStatus("idle");
+      return;
+    }
 
     if (!result.ok) {
       setStatus("idle");
-      setError(result.error);
+      // Don't flash an error if they just closed Google — leave the form usable.
+      if (!/cancelled/i.test(result.error)) {
+        setError(result.error);
+      }
       return;
     }
 
@@ -97,19 +128,13 @@ export function LoginModal({ onClose, onSuccess }: LoginModalProps) {
     <div
       className="dg-modal-backdrop"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget && status === "idle") {
-          onClose();
+        if (event.target === event.currentTarget) {
+          requestClose();
         }
       }}
     >
       <div className="dg-modal dg-login-modal" role="dialog" aria-modal="true" aria-label="Sign in">
-        <button
-          type="button"
-          className="dg-modal-close"
-          onClick={onClose}
-          aria-label="Close"
-          disabled={status !== "idle"}
-        >
+        <button type="button" className="dg-modal-close" onClick={requestClose} aria-label="Close">
           <CloseIcon size={14} />
         </button>
 
@@ -124,7 +149,7 @@ export function LoginModal({ onClose, onSuccess }: LoginModalProps) {
           type="button"
           className="dg-btn dg-btn-secondary dg-login-google-btn"
           onClick={() => void handleGoogle()}
-          disabled={status !== "idle"}
+          disabled={busy}
         >
           {status === "google" ? (
             <>
@@ -152,7 +177,7 @@ export function LoginModal({ onClose, onSuccess }: LoginModalProps) {
               onChange={(event) => setUsername(event.target.value)}
               autoComplete="username"
               required
-              disabled={status !== "idle"}
+              disabled={busy}
             />
           </label>
 
@@ -164,7 +189,7 @@ export function LoginModal({ onClose, onSuccess }: LoginModalProps) {
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="current-password"
               required
-              disabled={status !== "idle"}
+              disabled={busy}
             />
           </label>
 
@@ -173,7 +198,7 @@ export function LoginModal({ onClose, onSuccess }: LoginModalProps) {
               type="checkbox"
               checked={remember}
               onChange={(event) => setRemember(event.target.checked)}
-              disabled={status !== "idle"}
+              disabled={busy}
             />
             <span>Remember me</span>
           </label>
