@@ -13,6 +13,7 @@ import type { ChatUIMessage } from "../types";
 import { CartReview } from "./CartReview";
 import { BrandLogo } from "./BrandLogo";
 import { ChatThread } from "./ChatThread";
+import { LoginModal } from "./LoginModal";
 import { ProductCardView } from "./ProductCard";
 import {
   CartIcon,
@@ -70,6 +71,7 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
     token: null,
     displayName: null,
   });
+  const [showLoginModal, setShowLoginModal] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -82,6 +84,11 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
       cancelled = true;
     };
   }, []);
+
+  function handleLoginSuccess(identity: WpIdentityResult): void {
+    setWpIdentity(identity);
+    setShowLoginModal(false);
+  }
 
   const transport = useMemo(
     () =>
@@ -260,25 +267,31 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
               New chat
             </button>
             {/*
-              History (multiple past conversations you can switch back to)
-              is a separate feature planned for later — recognizing the
-              visitor's existing WordPress login is step one, so this
-              reflects that real state (signed in vs not) rather than
-              promising a history list that isn't built yet.
+              History list is a follow-up feature — for now this is the
+              account entry point. Sign-in opens an in-widget modal that
+              uses the site's real WordPress login (no /my-account/ redirect).
             */}
             {wpIdentity.loggedIn ? (
-              <p className="dg-hero-sidebar-note">
-                <SparkleIcon size={13} />
-                Signed in as <strong>{wpIdentity.displayName ?? "you"}</strong>. Saved history is coming soon.
-              </p>
+              <div className="dg-hero-sidebar-account">
+                <span className="dg-hero-sidebar-avatar" aria-hidden="true">
+                  {(wpIdentity.displayName ?? "U").trim().charAt(0).toUpperCase()}
+                </span>
+                <div className="dg-hero-sidebar-account-text">
+                  <strong>{wpIdentity.displayName ?? "Signed in"}</strong>
+                  <span>Saved history coming soon</span>
+                </div>
+              </div>
             ) : (
-              <p className="dg-hero-sidebar-note">
-                <SparkleIcon size={13} />
-                <a href="/my-account/" className="dg-hero-sidebar-link">
+              <div className="dg-hero-sidebar-signin">
+                <p className="dg-hero-sidebar-signin-copy">Save chats and pick up where you left off.</p>
+                <button
+                  type="button"
+                  className="dg-btn dg-btn-primary dg-hero-signin-btn"
+                  onClick={() => setShowLoginModal(true)}
+                >
                   Sign in
-                </a>{" "}
-                to save and revisit past conversations.
-              </p>
+                </button>
+              </div>
             )}
           </aside>
 
@@ -462,6 +475,10 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
           </div>
         </div>
       )}
+
+      {showLoginModal ? (
+        <LoginModal onClose={() => setShowLoginModal(false)} onSuccess={handleLoginSuccess} />
+      ) : null}
     </div>
   );
 }
