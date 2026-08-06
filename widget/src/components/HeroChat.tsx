@@ -5,6 +5,13 @@ import { useChat } from "@ai-sdk/react";
 
 import { createNewSessionId, getOrCreateSessionId } from "../session";
 import { loadStoredConversation, saveStoredConversation } from "../conversation-storage";
+import {
+  deleteConversationApi,
+  fetchConversation,
+  fetchConversations,
+  saveConversation,
+  type ConversationSummary,
+} from "../conversation-api";
 import { useStoreCart } from "../use-store-cart";
 import { useMediaQuery } from "../use-media-query";
 import { getAllProductsFromMessages } from "../get-products-from-messages";
@@ -24,6 +31,7 @@ import {
   PlusIcon,
   SparkleIcon,
   ToolsIcon,
+  TrashIcon,
   TruckIcon,
   WrenchIcon,
 } from "./Icons";
@@ -72,6 +80,10 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
     displayName: null,
   });
   const [showLoginModal, setShowLoginModal] = React.useState(false);
+  const [conversations, setConversations] = React.useState<ConversationSummary[]>([]);
+  const [historyLoading, setHistoryLoading] = React.useState(false);
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [openingId, setOpeningId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -85,11 +97,6 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
     };
   }, []);
 
-  function handleLoginSuccess(identity: WpIdentityResult): void {
-    setWpIdentity(identity);
-    setShowLoginModal(false);
-  }
-
   const transport = useMemo(
     () =>
       new DefaultChatTransport<ChatUIMessage>({
@@ -100,11 +107,49 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
     [apiBase, sessionId, wpIdentity.token],
   );
 
-  const { messages, sendMessage, status, error, stop } = useChat<ChatUIMessage>({
+  const { messages, setMessages, sendMessage, status, error, stop } = useChat<ChatUIMessage>({
     id: sessionId,
     transport,
     messages: restoredMessages,
   });
+
+  const refreshHistory = React.useCallback(async (token: string): Promise<void> => {
+    setHistoryLoading(true);
+    try {
+      const list = await fetchConversations(token);
+      setConversations(list);
+    } catch {
+      // Non-fatal — sidebar just stays empty / stale until the next save.
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!wpIdentity.token) {
+      setConversations([]);
+      return;
+    }
+    void refreshHistory(wpIdentity.token);
+  }, [wpIdentity.token, refreshHistory]);
+
+  function handleLoginSuccess(identity: WpIdentityResult): void {
+    setWpIdentity(identity);
+    setShowLoginModal(false);
+    // Guest chat sitting in this browser gets lifted into the account
+    // immediately so nothing is lost the first time they sign in.
+    if (identity.token && messages.length > 0) {
+      void saveConversation({
+        token: identity.token,
+        conversationId: sessionId,
+        messages,
+      })
+        .then(() => refreshHistory(identity.token!))
+        .catch(() => void refreshHistory(identity.token!));
+    } else if (identity.token) {
+      void refreshHistory(identity.token);
+    }
+  }
 
   const [input, setInput] = React.useState("");
   // Mobile/tablet: which full-screen view is showing (chat replaces cart and
@@ -151,7 +196,29 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
     }
 
     saveStoredConversation(sessionId, messages);
-  }, [sessionId, messages, status]);
+
+    // Logged-in users also persist to Redis (ChatGPT-style history). Guests
+    // stay on localStorage only — see conversation-api.ts / chat-history.ts.
+    if (!wpIdentity.token || messages.length === 0) {
+      return;
+    }
+
+    const token = wpIdentity.token;
+    void saveConversation({
+      token,
+      conversationId: sessionId,
+      messages,
+    })
+      .then((summary) => {
+        setConversations((prev) => {
+          const rest = prev.filter((item) => item.id !== summary.id);
+          return [summary, ...rest];
+        });
+      })
+      .catch(() => {
+        // Ignore transient save failures — localStorage still has a copy.
+      });
+  }, [sessionId, messages, status, wpIdentity.token]);
 
   React.useEffect(() => {
     return () => {
@@ -175,9 +242,68 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
    */
   function handleNewChat(): void {
     setSessionId(createNewSessionId());
+    setMessages([]);
     setInput("");
     setView("chat");
     setDesktopPanelTab("products");
+    setStarted(true);
+  }
+
+  async function handleOpenConversation(conversationId: string): Promise<void> {
+    if (!wpIdentity.token || openingId || conversationId === sessionId) {
+      if (conversationId === sessionId) {
+        setStarted(true);
+        setView("chat");
+      }
+      return;
+    }
+
+    setOpeningId(conversationId);
+    try {
+      const detail = await fetchConversation(wpIdentity.token, conversationId);
+      if (!detail) {
+        await refreshHistory(wpIdentity.token);
+        return;
+      }
+      setSessionId(detail.id);
+      setMessages(detail.messages);
+      saveStoredConversation(detail.id, detail.messages);
+      setInput("");
+      setView("chat");
+      setDesktopPanelTab("products");
+      setStarted(true);
+    } catch {
+      // Leave the current chat alone if the load fails.
+    } finally {
+      setOpeningId(null);
+    }
+  }
+
+  async function handleDeleteConversation(
+    event: React.MouseEvent,
+    conversationId: string,
+  ): Promise<void> {
+    event.preventDefault();
+    if (!wpIdentity.token || deletingId) {
+      return;
+    }
+
+    setDeletingId(conversationId);
+    try {
+      await deleteConversationApi(wpIdentity.token, conversationId);
+      setConversations((prev) => prev.filter((item) => item.id !== conversationId));
+      if (conversationId === sessionId) {
+        const nextId = createNewSessionId();
+        setSessionId(nextId);
+        setMessages([]);
+        setInput("");
+        saveStoredConversation(nextId, []);
+      }
+    } catch {
+      // Keep the row if delete failed.
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   async function submitText(rawText: string): Promise<void> {
@@ -231,23 +357,29 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
         instead of pinning to the top of whatever small content box happens
         to be showing.
       */}
-      <div className="dg-hero-corner-actions">
-        {!(isDesktop && isExpanded) ? (
-          <button
-            type="button"
-            className="dg-icon-btn dg-cart-btn dg-hero-cart-btn"
-            onClick={openCartView}
-            aria-label="View cart"
-            aria-pressed={isDesktop ? desktopPanelTab === "cart" : view === "cart"}
-          >
-            <CartIcon size={16} />
-            {storeCart.cart && storeCart.cart.items_count > 0 ? (
-              <span className="dg-cart-badge">{storeCart.cart.items_count}</span>
-            ) : null}
-          </button>
-        ) : null}
+      {/*
+        Idle (not chatting): no corner chrome — the cart icon used to sit
+        alone in the top-right of the idle hero and read as clutter with
+        nothing useful to do there yet. Cart only appears once chat is
+        open on mobile/tablet (desktop uses the side-panel Cart tab).
+      */}
+      {isExpanded ? (
+        <div className="dg-hero-corner-actions">
+          {!isDesktop ? (
+            <button
+              type="button"
+              className="dg-icon-btn dg-cart-btn dg-hero-cart-btn"
+              onClick={openCartView}
+              aria-label="View cart"
+              aria-pressed={view === "cart"}
+            >
+              <CartIcon size={16} />
+              {storeCart.cart && storeCart.cart.items_count > 0 ? (
+                <span className="dg-cart-badge">{storeCart.cart.items_count}</span>
+              ) : null}
+            </button>
+          ) : null}
 
-        {isExpanded ? (
           <button
             type="button"
             className="dg-icon-btn dg-hero-close-btn"
@@ -256,8 +388,8 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
           >
             <CloseIcon size={15} />
           </button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {isExpanded && isDesktop ? (
         <div className="dg-hero-expanded dg-hero-3col">
@@ -266,11 +398,55 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
               <PlusIcon size={14} />
               New chat
             </button>
-            {/*
-              History list is a follow-up feature — for now this is the
-              account entry point. Sign-in opens an in-widget modal that
-              uses the site's real WordPress login (no /my-account/ redirect).
-            */}
+
+            {wpIdentity.loggedIn ? (
+              <div className="dg-hero-history">
+                <p className="dg-hero-history-label">Chats</p>
+                {historyLoading && conversations.length === 0 ? (
+                  <p className="dg-hero-history-empty">Loading…</p>
+                ) : null}
+                {!historyLoading && conversations.length === 0 ? (
+                  <p className="dg-hero-history-empty">Your saved chats will show up here.</p>
+                ) : null}
+                <ul className="dg-hero-history-list">
+                  {conversations.map((conversation) => {
+                    const isActive = conversation.id === sessionId;
+                    const isOpening = openingId === conversation.id;
+                    const isDeleting = deletingId === conversation.id;
+                    return (
+                      <li
+                        key={conversation.id}
+                        className={`dg-hero-history-item${isActive ? " dg-hero-history-item-active" : ""}`}
+                      >
+                        <button
+                          type="button"
+                          className="dg-hero-history-item-open"
+                          onClick={() => void handleOpenConversation(conversation.id)}
+                          disabled={isOpening || isDeleting}
+                          title={conversation.title}
+                        >
+                          {isOpening ? "Opening…" : conversation.title}
+                        </button>
+                        <button
+                          type="button"
+                          className="dg-hero-history-delete"
+                          aria-label={`Delete ${conversation.title}`}
+                          disabled={isOpening || isDeleting}
+                          onClick={(event) => void handleDeleteConversation(event, conversation.id)}
+                        >
+                          {isDeleting ? (
+                            <span className="dg-spinner" aria-hidden="true" />
+                          ) : (
+                            <TrashIcon size={12} />
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
+
             {wpIdentity.loggedIn ? (
               <div className="dg-hero-sidebar-account">
                 <span className="dg-hero-sidebar-avatar" aria-hidden="true">
@@ -278,12 +454,12 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
                 </span>
                 <div className="dg-hero-sidebar-account-text">
                   <strong>{wpIdentity.displayName ?? "Signed in"}</strong>
-                  <span>Saved history coming soon</span>
+                  <span>Chats saved to your account</span>
                 </div>
               </div>
             ) : (
               <div className="dg-hero-sidebar-signin">
-                <p className="dg-hero-sidebar-signin-copy">Save chats and pick up where you left off.</p>
+                <p className="dg-hero-sidebar-signin-copy">Sign in to save chats and revisit them anytime.</p>
                 <button
                   type="button"
                   className="dg-btn dg-btn-primary dg-hero-signin-btn"

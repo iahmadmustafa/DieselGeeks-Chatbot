@@ -2403,6 +2403,119 @@ export const WIDGET_CSS = `
   transform: scale(0.97);
 }
 
+.dg-hero-history {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.35rem;
+}
+
+.dg-hero-history-label {
+  margin: 0;
+  padding: 0 0.15rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dg-muted);
+}
+
+.dg-hero-history-empty {
+  margin: 0.35rem 0 0;
+  padding: 0 0.15rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--dg-muted);
+}
+
+.dg-hero-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-height: 0;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.dg-hero-history-item {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  border-radius: var(--dg-radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  min-width: 0;
+}
+
+.dg-hero-history-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dg-hero-history-item-active {
+  background: rgba(101, 210, 213, 0.1);
+  border-color: rgba(101, 210, 213, 0.22);
+}
+
+.dg-hero-history-item-open {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--dg-text-secondary);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.55rem 0.45rem;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dg-hero-history-item-active .dg-hero-history-item-open {
+  color: var(--dg-text);
+}
+
+.dg-hero-history-item-open:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.dg-hero-history-delete {
+  flex-shrink: 0;
+  width: 1.7rem;
+  height: 1.7rem;
+  margin-right: 0.2rem;
+  border: none;
+  border-radius: var(--dg-radius-sm);
+  background: transparent;
+  color: var(--dg-muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dg-dur-fast) ease, color var(--dg-dur-fast) ease, background var(--dg-dur-fast) ease;
+}
+
+.dg-hero-history-item:hover .dg-hero-history-delete,
+.dg-hero-history-item:focus-within .dg-hero-history-delete,
+.dg-hero-history-delete:disabled {
+  opacity: 1;
+}
+
+.dg-hero-history-delete:hover {
+  color: var(--dg-danger);
+  background: rgba(248, 113, 113, 0.12);
+}
+
 .dg-hero-sidebar-signin,
 .dg-hero-sidebar-account {
   margin-top: auto;

@@ -10,8 +10,8 @@ export function buildCorsHeaders(request: Request): HeadersInit {
 
   return {
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-DG-Identity-Token, Authorization",
     Vary: "Origin",
   };
 }
