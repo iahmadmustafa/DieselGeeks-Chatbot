@@ -1413,14 +1413,23 @@ export const WIDGET_CSS = `
    * reply reveals itself as a gentle cascade instead of a single flash.
    */
   opacity: 0;
-  animation: dg-product-card-in var(--dg-dur-slow) var(--dg-ease-out) forwards;
-  animation-delay: calc(var(--dg-stagger, 0) * 90ms);
+  /*
+   * Both the per-card duration and the gap between cards were too quick to
+   * actually register as "one by one" — with only ~90ms between cards and
+   * a 320ms fade, a list of 3-5 results was fully in well under a second
+   * with heavy overlap between neighbours, reading as "all at once" even
+   * though it was technically staggered. Slower per-card motion plus a
+   * clearly longer gap between starts makes each card's arrival legible on
+   * its own before the next one begins.
+   */
+  animation: dg-product-card-in 560ms var(--dg-ease-out) forwards;
+  animation-delay: calc(var(--dg-stagger, 0) * 220ms);
 }
 
 @keyframes dg-product-card-in {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.98);
+    transform: translateY(16px) scale(0.97);
   }
   to {
     opacity: 1;
@@ -2409,6 +2418,22 @@ export const WIDGET_CSS = `
 .dg-hero-sidebar-note svg {
   flex-shrink: 0;
   margin-top: 0.15rem;
+  color: var(--dg-accent);
+}
+
+.dg-hero-sidebar-note strong {
+  color: var(--dg-text);
+  font-weight: 700;
+}
+
+.dg-hero-sidebar-link {
+  color: var(--dg-accent-light);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.dg-hero-sidebar-link:hover {
   color: var(--dg-accent);
 }
 

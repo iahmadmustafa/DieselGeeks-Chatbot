@@ -2,10 +2,17 @@
 /**
  * Diesel Geeks Parts Assistant embed
  *
- * Add to the child theme functions.php:
- *   require_once get_stylesheet_directory() . '/dieselgeeks-chat-embed.php';
+ * Optional alternative to a manual script tag for loading the chat loader.
+ * If the site already loads dieselgeeks-chat-loader.js via Elementor /
+ * footer script tag, do NOT also require this file (it would double-load).
  *
- * Or paste the wp_footer hook below directly into functions.php.
+ * Login/identity is handled separately by dieselgeeks-chat-identity.php —
+ * that file is self-contained and is what you need for the WP login bridge
+ * when using the script-tag loader.
+ *
+ * Add to the child theme functions.php (only if you are NOT using a script tag):
+ *   require_once get_stylesheet_directory() . '/dieselgeeks-chat-embed.php';
+ *   require_once get_stylesheet_directory() . '/dieselgeeks-chat-identity.php';
  */
 
 if (!defined('ABSPATH')) {
@@ -40,7 +47,7 @@ function dieselgeeks_enqueue_chat_widget(): void
     wp_script_add_data('dieselgeeks-chat-loader', 'async', true);
     wp_script_add_data('dieselgeeks-chat-loader', 'defer', true);
 
-    // Pass API base URL to the loader via a tiny inline prefix.
+    // Identity config (ajaxUrl + nonce) is injected by dieselgeeks-chat-identity.php.
     wp_add_inline_script(
         'dieselgeeks-chat-loader',
         'window.DIESELGEEKS_CHAT_API_URL = ' . wp_json_encode($api_url) . ';',

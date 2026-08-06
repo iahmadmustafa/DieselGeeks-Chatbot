@@ -296,6 +296,17 @@ export function getResendFromEmail(): string {
   );
 }
 
+/**
+ * Shared secret with the WordPress site's dieselgeeks-chat-identity.php —
+ * used to verify the HMAC signature on identity tokens it issues, so we can
+ * trust "this request really is from WP user #123" without WordPress and
+ * this app sharing a database or session store. See
+ * src/lib/auth/wp-identity.ts.
+ */
+export function getWpChatJwtSecret(): string | null {
+  return readEnvLocalValue("WP_CHAT_JWT_SECRET") ?? readEnv("WP_CHAT_JWT_SECRET");
+}
+
 export function getFitmentLlmReasoningEffort(): FitmentLlmReasoningEffort {
   const configured =
     readEnvLocalValue("FITMENT_LLM_REASONING_EFFORT") ??

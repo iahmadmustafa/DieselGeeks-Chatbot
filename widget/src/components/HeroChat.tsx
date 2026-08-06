@@ -8,6 +8,7 @@ import { loadStoredConversation, saveStoredConversation } from "../conversation-
 import { useStoreCart } from "../use-store-cart";
 import { useMediaQuery } from "../use-media-query";
 import { getAllProductsFromMessages } from "../get-products-from-messages";
+import { getWpIdentity, type WpIdentityResult } from "../wp-identity";
 import type { ChatUIMessage } from "../types";
 import { CartReview } from "./CartReview";
 import { BrandLogo } from "./BrandLogo";
@@ -56,14 +57,40 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
   const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const [sessionId, setSessionId] = React.useState(() => getOrCreateSessionId());
   const restoredMessages = useMemo(() => loadStoredConversation(sessionId), [sessionId]);
+  /*
+   * Fetched once on mount from the WP site's own login session (see
+   * wp-identity.ts) — not used for anything visible yet beyond the sidebar
+   * "signed in as ..." line, but forwarding the token on every chat request
+   * from day one means a future server-side chat history feature won't
+   * need another round of widget changes to start associating
+   * conversations with a WordPress account.
+   */
+  const [wpIdentity, setWpIdentity] = React.useState<WpIdentityResult>({
+    loggedIn: false,
+    token: null,
+    displayName: null,
+  });
+
+  React.useEffect(() => {
+    let cancelled = false;
+    void getWpIdentity().then((identity) => {
+      if (!cancelled) {
+        setWpIdentity(identity);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport<ChatUIMessage>({
         api: `${apiBase}/api/chat`,
         credentials: "omit",
-        body: { sessionId },
+        body: { sessionId, wpIdentityToken: wpIdentity.token },
       }),
-    [apiBase, sessionId],
+    [apiBase, sessionId, wpIdentity.token],
   );
 
   const { messages, sendMessage, status, error, stop } = useChat<ChatUIMessage>({
@@ -233,15 +260,26 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
               New chat
             </button>
             {/*
-              History (multiple past conversations you can switch back to) is
-              a separate, login-gated feature planned for later — this is a
-              placeholder so the sidebar isn't just dead space until then,
-              not a promise of what's already built.
+              History (multiple past conversations you can switch back to)
+              is a separate feature planned for later — recognizing the
+              visitor's existing WordPress login is step one, so this
+              reflects that real state (signed in vs not) rather than
+              promising a history list that isn't built yet.
             */}
-            <p className="dg-hero-sidebar-note">
-              <SparkleIcon size={13} />
-              Sign in soon to save and revisit past conversations.
-            </p>
+            {wpIdentity.loggedIn ? (
+              <p className="dg-hero-sidebar-note">
+                <SparkleIcon size={13} />
+                Signed in as <strong>{wpIdentity.displayName ?? "you"}</strong>. Saved history is coming soon.
+              </p>
+            ) : (
+              <p className="dg-hero-sidebar-note">
+                <SparkleIcon size={13} />
+                <a href="/my-account/" className="dg-hero-sidebar-link">
+                  Sign in
+                </a>{" "}
+                to save and revisit past conversations.
+              </p>
+            )}
           </aside>
 
           <div className="dg-hero-chat-col">
