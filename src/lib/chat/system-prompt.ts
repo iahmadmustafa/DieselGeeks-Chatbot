@@ -91,7 +91,7 @@ Here's what I found for your **4JJ1**:
 Short note (1–2 sentences) on differences or what to check next.
 Please confirm fitment for your exact vehicle before ordering.
 
-- List at most 5 products unless the customer asks for more.
+- List every matching product from the tool results (don't hide or truncate the set) — keep each line short; the product cards carry the extra detail.
 - If only one product fits, one short paragraph + the fitment disclaimer is enough — no mini-essay.
 - If multiple products match, one brief sentence on how they differ, then let the customer choose.`;
 }
