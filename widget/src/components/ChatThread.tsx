@@ -5,7 +5,7 @@ import { getProductsFromMessage } from "../get-products-from-messages";
 import type { ChatUIMessage } from "../types";
 import { ProductCardView } from "./ProductCard";
 import { BrandLogo } from "./BrandLogo";
-import { TypingIndicator } from "./TypingIndicator";
+import { ActivityStatus } from "./ActivityStatus";
 import { FuelIcon } from "./Icons";
 
 const MAX_MESSAGE_LENGTH = 500;
@@ -67,10 +67,18 @@ export function ChatThread({
   const isBusy = status === "submitted" || status === "streaming";
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : undefined;
   const lastMessageId = lastMessage?.id;
-  const lastMessageHasContent =
-    lastMessage?.role === "assistant" &&
-    (getMessageText(lastMessage).length > 0 || getProductsFromMessage(lastMessage).length > 0);
-  const showTypingIndicator = status === "submitted" || (status === "streaming" && !lastMessageHasContent);
+  /*
+   * Keep the activity trail up until reply *text* appears. Product tool
+   * results often land 1–2s earlier, but cards are intentionally held back
+   * until text starts (see products gating below) — treating products as
+   * "content" here hid the activity and left a blank gap with only Stop.
+   */
+  const lastMessageHasVisibleReply =
+    lastMessage?.role === "assistant" && getMessageText(lastMessage).length > 0;
+  const showActivityStatus =
+    status === "submitted" || (status === "streaming" && !lastMessageHasVisibleReply);
+  const activityAssistantMessage =
+    lastMessage?.role === "assistant" && showActivityStatus ? lastMessage : undefined;
 
   // Used to tell "user scrolled up" apart from "container grew taller"
   // (both change scrollTop's relationship to the bottom, but only the
@@ -126,7 +134,7 @@ export function ChatThread({
             </div>
             <h3>Find the right diesel part</h3>
             <p>
-              Ask about injectors, pumps, fuel lines, or fitment for your ute or 4x4 — I&apos;ll search our live
+              Ask about injectors, pumps, fuel lines, or fitment for your ute or 4x4. I&apos;ll search our live
               catalog for real products with prices and stock.
             </p>
             <div className="dg-empty-chips">
@@ -212,7 +220,9 @@ export function ChatThread({
           );
         })}
 
-        {showTypingIndicator ? <TypingIndicator logoUrl={logoUrl} /> : null}
+        {showActivityStatus ? (
+          <ActivityStatus logoUrl={logoUrl} status={status} assistantMessage={activityAssistantMessage} />
+        ) : null}
         <div ref={messagesEndRef} />
       </div>
 

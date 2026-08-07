@@ -1687,52 +1687,121 @@ export const WIDGET_CSS = `
   to { transform: rotate(360deg); }
 }
 
-/* ---------- Typing indicator ---------- */
+/* ---------- Activity status (replaces bouncing-dots typing bubble) ---------- */
 
-.dg-typing-row {
+.dg-activity-row {
   display: flex;
-  align-items: flex-end;
-  gap: 0.5rem;
+  align-items: flex-start;
+  gap: 0.55rem;
   animation: dg-fade-up var(--dg-dur-slow) var(--dg-ease-out);
 }
 
-.dg-typing {
-  display: inline-flex;
+.dg-activity {
+  min-width: 0;
+  padding: 0.15rem 0 0.1rem;
+}
+
+.dg-activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.dg-activity-step {
+  display: grid;
+  grid-template-columns: 0.7rem minmax(0, 1fr);
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.55rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   color: var(--dg-muted);
-  font-size: 0.82rem;
-  padding: 0.6rem 0.9rem;
-  background: var(--dg-surface-2);
-  border: 1px solid var(--dg-border);
-  border-radius: var(--dg-radius-lg);
-  border-bottom-left-radius: 6px;
+  transition: color var(--dg-dur-fast) ease, opacity var(--dg-dur-fast) ease;
 }
 
-.dg-typing-dots {
-  display: inline-flex;
-  gap: 0.22rem;
+.dg-activity-step-pending {
+  opacity: 0.45;
 }
 
-.dg-typing-dots span {
-  width: 0.36rem;
-  height: 0.36rem;
+.dg-activity-step-done {
+  color: var(--dg-text-secondary);
+  opacity: 0.72;
+}
+
+.dg-activity-step-active {
+  color: var(--dg-accent-light);
+  opacity: 1;
+}
+
+.dg-activity-rail {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 0.7rem;
+  height: 1rem;
+}
+
+.dg-activity-rail::before {
+  content: "";
+  position: absolute;
+  top: -0.35rem;
+  bottom: -0.35rem;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dg-activity-step:first-child .dg-activity-rail::before {
+  top: 50%;
+}
+
+.dg-activity-step:last-child .dg-activity-rail::before {
+  bottom: 50%;
+}
+
+.dg-activity-dot {
+  position: relative;
+  z-index: 1;
+  width: 0.38rem;
+  height: 0.38rem;
   border-radius: 50%;
+  background: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 0 0 3px rgba(13, 16, 19, 0.85);
+}
+
+.dg-activity-step-done .dg-activity-dot {
+  background: rgba(101, 210, 213, 0.55);
+}
+
+.dg-activity-step-active .dg-activity-dot {
   background: var(--dg-accent);
-  animation: dg-bounce 1.1s infinite ease-in-out;
+  box-shadow: 0 0 0 3px rgba(13, 16, 19, 0.85), 0 0 0 5px rgba(101, 210, 213, 0.16);
+  animation: dg-activity-pulse 1.2s ease-in-out infinite;
 }
 
-.dg-typing-dots span:nth-child(2) {
-  animation-delay: 0.14s;
+.dg-activity-step-active .dg-activity-label {
+  animation: dg-activity-label-pulse 1.2s ease-in-out infinite;
 }
 
-.dg-typing-dots span:nth-child(3) {
-  animation-delay: 0.28s;
+@keyframes dg-activity-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }
 
-@keyframes dg-bounce {
-  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-  40% { transform: translateY(-4px); opacity: 1; }
+@keyframes dg-activity-label-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dg-activity-step-active .dg-activity-dot,
+  .dg-activity-step-active .dg-activity-label {
+    animation: none;
+  }
 }
 
 /* ---------- Composer ---------- */
