@@ -3,7 +3,8 @@ import * as React from "react";
 import type { ChatUIMessage } from "../types";
 import { BrandLogo } from "./BrandLogo";
 
-type StepId = "thinking" | "checking" | "searching" | "makes" | "writing";
+type StepId = "thinking" | "checking" | "searching" | "makes" | "orders" | "writing";
+type KnownTool = "search_products" | "list_catalog_makes" | "lookup_order" | "list_my_orders";
 
 interface ActivityStep {
   id: StepId;
@@ -23,13 +24,11 @@ const STEP_LABELS: Record<StepId, string> = {
   checking: "Checking your question",
   searching: "Searching the catalog",
   makes: "Looking up vehicles",
+  orders: "Checking your order",
   writing: "Preparing your answer",
 };
 
-function isToolPart(
-  part: ChatUIMessage["parts"][number],
-  toolName: "search_products" | "list_catalog_makes",
-): boolean {
+function isToolPart(part: ChatUIMessage["parts"][number], toolName: KnownTool): boolean {
   return part.type === `tool-${toolName}`;
 }
 
@@ -51,9 +50,8 @@ function isToolDone(part: ChatUIMessage["parts"][number]): boolean {
 }
 
 /**
- * Builds the activity trail from real stream/tool signals. Product-search /
- * makes steps only appear when those tools actually run — a simple "hi"
- * never fakes a catalog search.
+ * Builds the activity trail from real stream/tool signals. Catalog / order
+ * steps only appear when those tools actually run.
  */
 export function deriveActivitySteps(
   status: string,
@@ -65,20 +63,27 @@ export function deriveActivitySteps(
 
   const searchPart = parts.find((part) => isToolPart(part, "search_products"));
   const makesPart = parts.find((part) => isToolPart(part, "list_catalog_makes"));
+  const orderPart =
+    parts.find((part) => isToolPart(part, "lookup_order")) ??
+    parts.find((part) => isToolPart(part, "list_my_orders"));
 
   const searchActive = searchPart ? isToolInProgress(searchPart) : false;
   const searchDone = searchPart ? isToolDone(searchPart) : false;
   const makesActive = makesPart ? isToolInProgress(makesPart) : false;
   const makesDone = makesPart ? isToolDone(makesPart) : false;
+  const ordersActive = orderPart ? isToolInProgress(orderPart) : false;
+  const ordersDone = orderPart ? isToolDone(orderPart) : false;
 
-  const anyToolSeen = Boolean(searchPart || makesPart);
-  const anyToolActive = searchActive || makesActive;
-  const anyToolDone = searchDone || makesDone;
+  const anyToolSeen = Boolean(searchPart || makesPart || orderPart);
+  const anyToolActive = searchActive || makesActive || ordersActive;
+  const anyToolDone = searchDone || makesDone || ordersDone;
 
   let activeId: StepId;
 
   if (status === "submitted" && !softAdvanced) {
     activeId = "thinking";
+  } else if (ordersActive) {
+    activeId = "orders";
   } else if (searchActive) {
     activeId = "searching";
   } else if (makesActive) {
@@ -90,7 +95,7 @@ export function deriveActivitySteps(
   } else if (status === "submitted" && softAdvanced) {
     activeId = "checking";
   } else if (anyToolActive) {
-    activeId = searchActive ? "searching" : "makes";
+    activeId = searchActive ? "searching" : makesActive ? "makes" : "orders";
   } else {
     activeId = "checking";
   }
@@ -101,6 +106,7 @@ export function deriveActivitySteps(
     activeId === "checking" ||
     activeId === "searching" ||
     activeId === "makes" ||
+    activeId === "orders" ||
     activeId === "writing" ||
     softAdvanced ||
     status === "streaming"
@@ -114,6 +120,10 @@ export function deriveActivitySteps(
 
   if (makesPart || activeId === "makes") {
     sequence.push({ id: "makes", label: STEP_LABELS.makes });
+  }
+
+  if (orderPart || activeId === "orders") {
+    sequence.push({ id: "orders", label: STEP_LABELS.orders });
   }
 
   if (activeId === "writing" || (anyToolDone && !hasText)) {

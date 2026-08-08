@@ -6,6 +6,7 @@ import { useChat } from "@ai-sdk/react";
 import { getOrCreateSessionId } from "../session";
 import { loadStoredConversation, saveStoredConversation } from "../conversation-storage";
 import { useStoreCart } from "../use-store-cart";
+import { getWpIdentity, type WpIdentityResult } from "../wp-identity";
 import type { ChatUIMessage } from "../types";
 import { CartReview } from "./CartReview";
 import { BrandLogo } from "./BrandLogo";
@@ -25,14 +26,32 @@ interface ChatWidgetProps {
 export function ChatWidget({ apiBase, logoUrl, isOpen, isMobile, onClose }: ChatWidgetProps) {
   const sessionId = useMemo(() => getOrCreateSessionId(), []);
   const restoredMessages = useMemo(() => loadStoredConversation(sessionId), [sessionId]);
+  const [wpIdentity, setWpIdentity] = React.useState<WpIdentityResult>({
+    loggedIn: false,
+    token: null,
+    displayName: null,
+  });
+
+  React.useEffect(() => {
+    let cancelled = false;
+    void getWpIdentity().then((identity) => {
+      if (!cancelled) {
+        setWpIdentity(identity);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport<ChatUIMessage>({
         api: `${apiBase}/api/chat`,
         credentials: "omit",
-        body: { sessionId },
+        body: { sessionId, wpIdentityToken: wpIdentity.token },
       }),
-    [apiBase, sessionId],
+    [apiBase, sessionId, wpIdentity.token],
   );
 
   const { messages, sendMessage, status, error, stop } = useChat<ChatUIMessage>({

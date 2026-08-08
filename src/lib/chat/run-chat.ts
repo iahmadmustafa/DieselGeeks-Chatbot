@@ -7,6 +7,7 @@ import {
   streamText,
 } from "ai";
 
+import type { WpIdentity } from "@/lib/auth/wp-identity";
 import { previewText, trimChatHistory } from "@/lib/chat/guardrails";
 import { extractCatalogScope } from "@/lib/catalog/scope";
 import { buildSystemPrompt } from "@/lib/chat/system-prompt";
@@ -41,6 +42,7 @@ function createChatModel() {
 export async function runChat(options: {
   messages: ChatUIMessage[];
   sessionId: string;
+  identity?: WpIdentity | null;
 }): Promise<ReadableStream> {
   let snapshot;
   try {
@@ -60,18 +62,22 @@ export async function runChat(options: {
   const searchCalls: ConversationSearchCall[] = [];
   let assistantText = "";
 
-  const tools = createChatTools(snapshot, {
-    onSearchComplete: (result, args) => {
-      searchCalls.push({
-        args,
-        match_type: result.match_type,
-        result_count: result.result_count,
-      });
-      const merged = mergeProductCards(collectedProducts, result.products);
-      collectedProducts.length = 0;
-      collectedProducts.push(...merged);
+  const tools = createChatTools(
+    snapshot,
+    {
+      onSearchComplete: (result, args) => {
+        searchCalls.push({
+          args,
+          match_type: result.match_type,
+          result_count: result.result_count,
+        });
+        const merged = mergeProductCards(collectedProducts, result.products);
+        collectedProducts.length = 0;
+        collectedProducts.push(...merged);
+      },
     },
-  });
+    { identity: options.identity ?? null },
+  );
 
   const userPreview = previewText(
     trimmedMessages
@@ -95,7 +101,9 @@ export async function runChat(options: {
       try {
         const result = streamText({
           model: createChatModel(),
-          system: buildSystemPrompt(catalogScope),
+          system: buildSystemPrompt(catalogScope, {
+            isLoggedIn: Boolean(options.identity),
+          }),
           messages: await convertToModelMessages(trimmedMessages, { tools }),
           tools,
           stopWhen: stepCountIs(5),
@@ -162,6 +170,7 @@ export async function runChat(options: {
 export async function createChatResponse(options: {
   messages: ChatUIMessage[];
   sessionId: string;
+  identity?: WpIdentity | null;
   headers?: HeadersInit;
 }): Promise<Response> {
   const stream = await runChat(options);

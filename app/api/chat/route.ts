@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { getWpIdentityFromRequest } from "@/lib/auth/request-identity";
 import { assistantUnavailableMessage, isDailyBudgetExceeded } from "@/lib/chat/budget";
 import { buildCorsHeaders, isOriginAllowed } from "@/lib/chat/cors";
 import {
@@ -18,6 +19,8 @@ export const maxDuration = 60;
 interface ChatRequestBody {
   messages?: Array<Omit<ChatUIMessage, "id"> & { id?: string }>;
   sessionId?: string;
+  /** Short-lived signed token from WordPress (dieselgeeks-chat-identity.php). */
+  wpIdentityToken?: string | null;
 }
 
 function normalizeMessages(
@@ -135,10 +138,13 @@ export async function POST(request: Request): Promise<Response> {
     });
   }
 
+  const identity = getWpIdentityFromRequest(request, body.wpIdentityToken);
+
   try {
     return await createChatResponse({
       messages,
       sessionId,
+      identity,
       headers: buildCorsHeaders(request),
     });
   } catch (error) {

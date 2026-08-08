@@ -86,4 +86,18 @@ describe("deriveActivitySteps", () => {
     const steps = deriveActivitySteps("streaming", message, false);
     expect(steps.find((step) => step.id === "makes")?.phase).toBe("active");
   });
+
+  it("shows Checking your order for lookup_order", () => {
+    const message = assistantWithParts([
+      {
+        type: "tool-lookup_order",
+        toolCallId: "t3",
+        state: "input-available",
+        input: { order_id: "15956", email: "sam@example.com" },
+      } as ChatUIMessage["parts"][number],
+    ]);
+
+    const steps = deriveActivitySteps("streaming", message, false);
+    expect(steps.find((step) => step.id === "orders")?.phase).toBe("active");
+  });
 });

@@ -1,8 +1,10 @@
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
+import type { WpIdentity } from "@/lib/auth/wp-identity";
 import { enrichSearchResult, extractCatalogScope } from "@/lib/catalog/scope";
 import { searchProducts } from "@/lib/search/search-products";
+import { listMyOrders, lookupOrder } from "@/lib/woocommerce/orders";
 import type { ProductSnapshot } from "@/types/catalog";
 import type {
   ConversationSearchCall,
@@ -37,11 +39,17 @@ export interface ChatToolCallbacks {
   onSearchComplete: (result: SearchProductsToolResult, args: SearchProductsParams) => void;
 }
 
+export interface CreateChatToolsOptions {
+  identity?: WpIdentity | null;
+}
+
 export function createChatTools(
   snapshot: ProductSnapshot,
   callbacks: ChatToolCallbacks,
+  options: CreateChatToolsOptions = {},
 ): ToolSet {
   const catalogScope = extractCatalogScope(snapshot.products);
+  const identity = options.identity ?? null;
 
   return {
     list_catalog_makes: tool({
@@ -64,6 +72,46 @@ export function createChatTools(
         callbacks.onSearchComplete(enriched, input);
         return enriched;
       },
+    }),
+    lookup_order: tool({
+      description:
+        "Look up a WooCommerce order status by order number. Guests must provide the checkout email. Signed-in customers can omit email if the order belongs to their account. Use for 'where is my order', order status, or tracking-style questions. Never invent status — only report tool results.",
+      inputSchema: z.object({
+        order_id: z
+          .union([z.string(), z.number()])
+          .describe("WooCommerce order number, e.g. 15956 or '#15956'."),
+        email: z
+          .string()
+          .email()
+          .optional()
+          .describe(
+            "Billing/checkout email. Required for guests. Optional when the customer is signed in and the order is on their account.",
+          ),
+      }),
+      execute: async (input) =>
+        lookupOrder({
+          orderId: input.order_id,
+          email: input.email,
+          identity,
+        }),
+    }),
+    list_my_orders: tool({
+      description:
+        "List the signed-in customer's recent WooCommerce orders. Requires login. Use when they ask 'show my orders' or 'what have I ordered' without a specific order number. Guests should use lookup_order with order number + email instead.",
+      inputSchema: z.object({
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(10)
+          .optional()
+          .describe("How many recent orders to return (default 5, max 10)."),
+      }),
+      execute: async (input) =>
+        listMyOrders({
+          identity,
+          limit: input.limit,
+        }),
     }),
   };
 }
