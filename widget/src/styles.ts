@@ -800,108 +800,168 @@ export const WIDGET_CSS = `
 .dg-cart-shipping {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  padding: 0.85rem 0.9rem;
+  gap: 0.75rem;
+  padding: 0.9rem;
   border-radius: var(--dg-radius-md);
-  background: var(--dg-surface-2);
-  border: 1px solid var(--dg-border);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dg-cart-address-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 0.15rem;
 }
 
 .dg-cart-shipping-title {
   margin: 0;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--dg-text);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dg-text-secondary);
 }
 
 .dg-cart-shipping-note {
-  margin: 0 0 0.65rem;
-  font-size: 0.72rem;
-  line-height: 1.4;
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.35;
   color: var(--dg-muted);
 }
 
 .dg-cart-billing-same {
   display: flex;
-  align-items: flex-start;
-  gap: 0.55rem;
-  margin: 0.75rem 0 0.25rem;
-  font-size: 0.8rem;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0.15rem 0 0;
+  padding: 0.65rem 0.7rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 0.78rem;
   font-weight: 600;
+  line-height: 1.35;
   color: var(--dg-text-secondary);
   cursor: pointer;
+  transition: border-color var(--dg-dur-fast) ease, background var(--dg-dur-fast) ease;
 }
 
-.dg-cart-billing-same input {
-  margin-top: 0.15rem;
-  width: auto;
-  accent-color: var(--dg-accent);
+.dg-cart-billing-same:hover {
+  border-color: rgba(101, 210, 213, 0.28);
+  background: rgba(101, 210, 213, 0.06);
+}
+
+.dg-cart-billing-same input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  min-height: 0;
+  padding: 0;
+  border-radius: 0.28rem;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  background: rgba(10, 12, 14, 0.9);
+  box-shadow: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: border-color var(--dg-dur-fast) ease, background var(--dg-dur-fast) ease;
+}
+
+.dg-cart-billing-same input[type="checkbox"]::after {
+  content: "";
+  width: 0.28rem;
+  height: 0.48rem;
+  border: solid #06282a;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-0.5px, -0.5px) scale(0);
+  transition: transform var(--dg-dur-fast) ease;
+}
+
+.dg-cart-billing-same input[type="checkbox"]:checked {
+  border-color: var(--dg-accent);
+  background: var(--dg-accent);
+}
+
+.dg-cart-billing-same input[type="checkbox"]:checked::after {
+  transform: rotate(45deg) translate(-0.5px, -0.5px) scale(1);
+}
+
+.dg-cart-billing-same input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--dg-accent-soft);
 }
 
 .dg-cart-billing-block {
-  margin-top: 0.65rem;
-  padding-top: 0.75rem;
+  margin-top: 0.15rem;
+  padding: 0.75rem 0 0;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
+  gap: 0.45rem;
 }
 
 .dg-cart-address-form {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.45rem;
 }
 
 .dg-cart-address-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
+  gap: 0.45rem;
 }
 
 .dg-cart-address-row-3 {
-  grid-template-columns: 1.4fr 0.8fr 1fr;
+  grid-template-columns: minmax(0, 1.2fr) minmax(4.2rem, 0.7fr) minmax(4.5rem, 0.85fr);
 }
 
-.dg-cart-address-form input,
+.dg-cart-address-form input:not([type="checkbox"]):not([type="radio"]),
 .dg-cart-address-form select {
-  min-height: 2.4rem;
-  border-radius: var(--dg-radius-sm);
-  border: 1px solid var(--dg-border-strong);
-  background: var(--dg-bg-soft);
+  min-height: 2.25rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 10, 12, 0.72);
   color: var(--dg-text);
-  padding: 0.5rem 0.6rem;
+  padding: 0.45rem 0.6rem;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   width: 100%;
 }
 
-.dg-cart-address-form input::placeholder {
-  color: var(--dg-muted);
+.dg-cart-address-form input:not([type="checkbox"]):not([type="radio"])::placeholder {
+  color: rgba(139, 147, 161, 0.85);
 }
 
-.dg-cart-address-form input:focus,
+.dg-cart-address-form input:not([type="checkbox"]):not([type="radio"]):focus,
 .dg-cart-address-form select:focus {
   outline: none;
-  border-color: var(--dg-accent);
-  box-shadow: 0 0 0 3px var(--dg-accent-soft);
+  border-color: rgba(101, 210, 213, 0.55);
+  box-shadow: 0 0 0 2px rgba(101, 210, 213, 0.12);
 }
 
 .dg-cart-shipping-submit-row {
   display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
 }
 
 .dg-cart-shipping-submit {
-  align-self: flex-start;
-  flex-shrink: 0;
+  width: 100%;
+  justify-content: center;
 }
 
 .dg-cart-shipping-hint {
   font-size: 0.68rem;
+  line-height: 1.35;
   color: var(--dg-muted);
+  text-align: center;
 }
 
 .dg-cart-shipping-error {

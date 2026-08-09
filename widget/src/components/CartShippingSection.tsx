@@ -131,8 +131,10 @@ export function CartShippingSection({ cart, onUpdateAddresses, onSelectRate }: C
   return (
     <div className="dg-cart-shipping">
       <form className="dg-cart-address-form" onSubmit={(event) => void handleSubmit(event)}>
-        <h4 className="dg-cart-shipping-title">Shipping address</h4>
-        <p className="dg-cart-shipping-note">We’ll remember this on this device for next time.</p>
+        <div className="dg-cart-address-heading">
+          <h4 className="dg-cart-shipping-title">Shipping address</h4>
+          <p className="dg-cart-shipping-note">Saved on this device for next time</p>
+        </div>
 
         <AddressFieldsInputs values={shipping} onChange={handleShippingChange} idPrefix="ship" />
 
@@ -147,7 +149,7 @@ export function CartShippingSection({ cart, onUpdateAddresses, onSelectRate }: C
               setBilling(shipping);
             }}
           />
-          <span>Billing address same as shipping</span>
+          <span>Same as shipping for billing</span>
         </label>
 
         {!billingSameAsShipping ? (
