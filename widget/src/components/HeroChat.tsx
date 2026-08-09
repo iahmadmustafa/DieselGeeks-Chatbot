@@ -550,7 +550,7 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
                     error={storeCart.error}
                     onRefresh={storeCart.refresh}
                     onBack={() => setDesktopPanelTab("products")}
-                    onUpdateAddress={storeCart.updateShippingAddress}
+                    onUpdateAddresses={storeCart.updateCustomerAddresses}
                     onSelectRate={storeCart.selectShippingRate}
                     onRemoveItem={storeCart.decrementItem}
                     embedded
@@ -569,7 +569,7 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
               error={storeCart.error}
               onRefresh={storeCart.refresh}
               onBack={() => setView("chat")}
-              onUpdateAddress={storeCart.updateShippingAddress}
+              onUpdateAddresses={storeCart.updateCustomerAddresses}
               onSelectRate={storeCart.selectShippingRate}
               onRemoveItem={storeCart.decrementItem}
             />

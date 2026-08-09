@@ -1,10 +1,16 @@
 import * as React from "react";
 
+import {
+  loadSavedCheckoutAddresses,
+  pickAddressForForm,
+  saveCheckoutAddresses,
+  type AddressFields,
+} from "../saved-addresses";
 import { formatStoreApiMoney, type StoreApiAddress, type StoreApiCart } from "../store-api";
 import type { StoreCartMutationResult } from "../use-store-cart";
 
 // Diesel Geeks currently ships within Australia only, so the country is
-// fixed rather than exposed as a form field — this keeps stage 2 focused and
+// fixed rather than exposed as a form field — this keeps checkout focused and
 // avoids sending state values WooCommerce would reject for other countries.
 const FIXED_COUNTRY = "AU";
 
@@ -19,50 +25,64 @@ const AU_STATES = [
   { code: "NT", label: "NT" },
 ];
 
-type AddressFormValues = Pick<
-  StoreApiAddress,
-  "first_name" | "last_name" | "address_1" | "address_2" | "city" | "state" | "postcode"
->;
-
-function initialValuesFromCart(cart: StoreApiCart): AddressFormValues {
-  const address = cart.shipping_address;
+function withCountry(values: AddressFields): StoreApiAddress {
   return {
-    first_name: address?.first_name ?? "",
-    last_name: address?.last_name ?? "",
-    address_1: address?.address_1 ?? "",
-    address_2: address?.address_2 ?? "",
-    city: address?.city ?? "",
-    state: address?.state ?? "",
-    postcode: address?.postcode ?? "",
+    ...values,
+    company: "",
+    country: FIXED_COUNTRY,
   };
+}
+
+function isAddressComplete(values: AddressFields): boolean {
+  return Boolean(
+    values.first_name.trim() &&
+      values.last_name.trim() &&
+      values.address_1.trim() &&
+      values.city.trim() &&
+      values.state.trim() &&
+      values.postcode.trim(),
+  );
 }
 
 interface CartShippingSectionProps {
   cart: StoreApiCart;
-  onUpdateAddress: (address: Partial<StoreApiAddress>) => Promise<StoreCartMutationResult>;
+  onUpdateAddresses: (addresses: {
+    shipping_address?: Partial<StoreApiAddress>;
+    billing_address?: Partial<StoreApiAddress>;
+  }) => Promise<StoreCartMutationResult>;
   onSelectRate: (packageId: number | string, rateId: string) => Promise<StoreCartMutationResult>;
 }
 
 /**
- * Stage 2 of in-chat checkout: a shipping address form that triggers
- * WooCommerce's real shipping-zone calculation via the Store API, plus a
- * picker for the resulting rates. Deliberately still has no payment UI —
- * "Review & checkout" in the parent view remains the safe fallback path
- * until stage 3 lands.
+ * Stage 2 of in-chat checkout: shipping + billing (Woo-style "same as
+ * shipping"), rate calculation, and local save so the next visit prefills.
  */
-export function CartShippingSection({ cart, onUpdateAddress, onSelectRate }: CartShippingSectionProps) {
-  const [values, setValues] = React.useState<AddressFormValues>(() => initialValuesFromCart(cart));
+export function CartShippingSection({ cart, onUpdateAddresses, onSelectRate }: CartShippingSectionProps) {
+  const saved = React.useMemo(() => loadSavedCheckoutAddresses(), []);
+
+  const [shipping, setShipping] = React.useState<AddressFields>(() =>
+    pickAddressForForm(cart.shipping_address, saved?.shipping),
+  );
+  const [billing, setBilling] = React.useState<AddressFields>(() =>
+    pickAddressForForm(cart.billing_address, saved?.billing),
+  );
+  const [billingSameAsShipping, setBillingSameAsShipping] = React.useState(
+    () => saved?.billingSameAsShipping ?? true,
+  );
   const [addressStatus, setAddressStatus] = React.useState<"idle" | "saving" | "error">("idle");
   const [addressError, setAddressError] = React.useState<string | null>(null);
   const [savingRateId, setSavingRateId] = React.useState<string | null>(null);
   const [rateError, setRateError] = React.useState<string | null>(null);
 
-  const canSubmit = Boolean(
-    values.address_1.trim() && values.city.trim() && values.state.trim() && values.postcode.trim(),
-  );
+  const effectiveBilling = billingSameAsShipping ? shipping : billing;
+  const canSubmit = isAddressComplete(shipping) && isAddressComplete(effectiveBilling);
 
-  function handleChange<K extends keyof AddressFormValues>(key: K, value: AddressFormValues[K]): void {
-    setValues((prev) => ({ ...prev, [key]: value }));
+  function handleShippingChange<K extends keyof AddressFields>(key: K, value: AddressFields[K]): void {
+    setShipping((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleBillingChange<K extends keyof AddressFields>(key: K, value: AddressFields[K]): void {
+    setBilling((prev) => ({ ...prev, [key]: value }));
   }
 
   async function handleSubmit(event: React.FormEvent): Promise<void> {
@@ -74,12 +94,25 @@ export function CartShippingSection({ cart, onUpdateAddress, onSelectRate }: Car
     setAddressStatus("saving");
     setAddressError(null);
 
-    const result = await onUpdateAddress({ ...values, country: FIXED_COUNTRY });
+    const shippingAddress = withCountry(shipping);
+    const billingAddress = withCountry(effectiveBilling);
+
+    const result = await onUpdateAddresses({
+      shipping_address: shippingAddress,
+      billing_address: billingAddress,
+    });
+
     if (!result.ok) {
       setAddressStatus("error");
       setAddressError(result.error);
       return;
     }
+
+    saveCheckoutAddresses({
+      shipping: shippingAddress,
+      billing: billingAddress,
+      billingSameAsShipping,
+    });
 
     setAddressStatus("idle");
   }
@@ -97,58 +130,32 @@ export function CartShippingSection({ cart, onUpdateAddress, onSelectRate }: Car
 
   return (
     <div className="dg-cart-shipping">
-      <h4 className="dg-cart-shipping-title">Shipping address</h4>
+      <form className="dg-cart-address-form" onSubmit={(event) => void handleSubmit(event)}>
+        <h4 className="dg-cart-shipping-title">Shipping address</h4>
+        <p className="dg-cart-shipping-note">We’ll remember this on this device for next time.</p>
 
-      <form className="dg-cart-address-form" onSubmit={handleSubmit}>
-        <div className="dg-cart-address-row">
+        <AddressFieldsInputs values={shipping} onChange={handleShippingChange} idPrefix="ship" />
+
+        <label className="dg-cart-billing-same">
           <input
-            type="text"
-            placeholder="First name"
-            value={values.first_name}
-            onChange={(event) => handleChange("first_name", event.target.value)}
+            type="checkbox"
+            checked={billingSameAsShipping}
+            onChange={(event) => {
+              const checked = event.target.checked;
+              setBillingSameAsShipping(checked);
+              // Keep forms in sync when toggling so unchecking doesn't leave a blank billing form.
+              setBilling(shipping);
+            }}
           />
-          <input
-            type="text"
-            placeholder="Last name"
-            value={values.last_name}
-            onChange={(event) => handleChange("last_name", event.target.value)}
-          />
-        </div>
-        <input
-          type="text"
-          placeholder="Address"
-          value={values.address_1}
-          onChange={(event) => handleChange("address_1", event.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="Apartment, suite, etc. (optional)"
-          value={values.address_2}
-          onChange={(event) => handleChange("address_2", event.target.value)}
-        />
-        <div className="dg-cart-address-row dg-cart-address-row-3">
-          <input
-            type="text"
-            placeholder="Suburb"
-            value={values.city}
-            onChange={(event) => handleChange("city", event.target.value)}
-          />
-          <select value={values.state} onChange={(event) => handleChange("state", event.target.value)}>
-            <option value="">State</option>
-            {AU_STATES.map((state) => (
-              <option key={state.code} value={state.code}>
-                {state.label}
-              </option>
-            ))}
-          </select>
-          <input
-            type="text"
-            placeholder="Postcode"
-            inputMode="numeric"
-            value={values.postcode}
-            onChange={(event) => handleChange("postcode", event.target.value)}
-          />
-        </div>
+          <span>Billing address same as shipping</span>
+        </label>
+
+        {!billingSameAsShipping ? (
+          <div className="dg-cart-billing-block">
+            <h4 className="dg-cart-shipping-title">Billing address</h4>
+            <AddressFieldsInputs values={billing} onChange={handleBillingChange} idPrefix="bill" />
+          </div>
+        ) : null}
 
         {addressError ? <p className="dg-cart-shipping-error">{addressError}</p> : null}
 
@@ -158,10 +165,10 @@ export function CartShippingSection({ cart, onUpdateAddress, onSelectRate }: Car
             className="dg-btn dg-btn-secondary dg-cart-shipping-submit"
             disabled={!canSubmit || addressStatus === "saving"}
           >
-            {addressStatus === "saving" ? "Calculating…" : "Calculate shipping"}
+            {addressStatus === "saving" ? "Saving…" : "Calculate shipping"}
           </button>
           {!canSubmit ? (
-            <span className="dg-cart-shipping-hint">Address, suburb, state &amp; postcode are required</span>
+            <span className="dg-cart-shipping-hint">Name, address, suburb, state &amp; postcode are required</span>
           ) : null}
         </div>
       </form>
@@ -199,5 +206,92 @@ export function CartShippingSection({ cart, onUpdateAddress, onSelectRate }: Car
         <p className="dg-cart-shipping-empty">No shipping options available for this address.</p>
       ) : null}
     </div>
+  );
+}
+
+function AddressFieldsInputs({
+  values,
+  onChange,
+  idPrefix,
+}: {
+  values: AddressFields;
+  onChange: <K extends keyof AddressFields>(key: K, value: AddressFields[K]) => void;
+  idPrefix: string;
+}) {
+  return (
+    <>
+      <div className="dg-cart-address-row">
+        <input
+          id={`${idPrefix}-first-name`}
+          type="text"
+          placeholder="First name"
+          autoComplete="given-name"
+          value={values.first_name}
+          onChange={(event) => onChange("first_name", event.target.value)}
+          required
+        />
+        <input
+          id={`${idPrefix}-last-name`}
+          type="text"
+          placeholder="Last name"
+          autoComplete="family-name"
+          value={values.last_name}
+          onChange={(event) => onChange("last_name", event.target.value)}
+          required
+        />
+      </div>
+      <input
+        id={`${idPrefix}-address-1`}
+        type="text"
+        placeholder="Address"
+        autoComplete="address-line1"
+        value={values.address_1}
+        onChange={(event) => onChange("address_1", event.target.value)}
+        required
+      />
+      <input
+        id={`${idPrefix}-address-2`}
+        type="text"
+        placeholder="Apartment, suite, etc. (optional)"
+        autoComplete="address-line2"
+        value={values.address_2}
+        onChange={(event) => onChange("address_2", event.target.value)}
+      />
+      <div className="dg-cart-address-row dg-cart-address-row-3">
+        <input
+          id={`${idPrefix}-city`}
+          type="text"
+          placeholder="Suburb"
+          autoComplete="address-level2"
+          value={values.city}
+          onChange={(event) => onChange("city", event.target.value)}
+          required
+        />
+        <select
+          id={`${idPrefix}-state`}
+          value={values.state}
+          autoComplete="address-level1"
+          onChange={(event) => onChange("state", event.target.value)}
+          required
+        >
+          <option value="">State</option>
+          {AU_STATES.map((state) => (
+            <option key={state.code} value={state.code}>
+              {state.label}
+            </option>
+          ))}
+        </select>
+        <input
+          id={`${idPrefix}-postcode`}
+          type="text"
+          placeholder="Postcode"
+          inputMode="numeric"
+          autoComplete="postal-code"
+          value={values.postcode}
+          onChange={(event) => onChange("postcode", event.target.value)}
+          required
+        />
+      </div>
+    </>
   );
 }

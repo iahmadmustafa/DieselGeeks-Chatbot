@@ -160,7 +160,7 @@ export function ChatWidget({ apiBase, logoUrl, isOpen, isMobile, onClose }: Chat
           error={storeCart.error}
           onRefresh={storeCart.refresh}
           onBack={() => setView("chat")}
-          onUpdateAddress={storeCart.updateShippingAddress}
+          onUpdateAddresses={storeCart.updateCustomerAddresses}
           onSelectRate={storeCart.selectShippingRate}
           onRemoveItem={storeCart.decrementItem}
         />

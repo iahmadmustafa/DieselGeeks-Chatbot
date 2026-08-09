@@ -21,6 +21,11 @@ export interface StoreCartState {
   cart: StoreApiCart | null;
   error: string | null;
   refresh: () => void;
+  updateCustomerAddresses: (addresses: {
+    shipping_address?: Partial<StoreApiAddress>;
+    billing_address?: Partial<StoreApiAddress>;
+  }) => Promise<StoreCartMutationResult>;
+  /** @deprecated Prefer updateCustomerAddresses — kept for older call sites. */
   updateShippingAddress: (address: Partial<StoreApiAddress>) => Promise<StoreCartMutationResult>;
   selectShippingRate: (packageId: number | string, rateId: string) => Promise<StoreCartMutationResult>;
   removeItem: (itemKey: string) => Promise<StoreCartMutationResult>;
@@ -95,9 +100,12 @@ export function useStoreCart(enabled: boolean): StoreCartState {
     return () => window.removeEventListener(CART_ADDED_EVENT, handleCartAdded);
   }, [load]);
 
-  const updateShippingAddress = React.useCallback(
-    async (address: Partial<StoreApiAddress>): Promise<StoreCartMutationResult> => {
-      const result = await updateCustomerAddressApi({ shipping_address: address });
+  const updateCustomerAddresses = React.useCallback(
+    async (addresses: {
+      shipping_address?: Partial<StoreApiAddress>;
+      billing_address?: Partial<StoreApiAddress>;
+    }): Promise<StoreCartMutationResult> => {
+      const result = await updateCustomerAddressApi(addresses);
       if (!result.ok) {
         return { ok: false, error: result.error };
       }
@@ -107,6 +115,12 @@ export function useStoreCart(enabled: boolean): StoreCartState {
       return { ok: true };
     },
     [],
+  );
+
+  const updateShippingAddress = React.useCallback(
+    async (address: Partial<StoreApiAddress>): Promise<StoreCartMutationResult> =>
+      updateCustomerAddresses({ shipping_address: address }),
+    [updateCustomerAddresses],
   );
 
   const selectShippingRate = React.useCallback(
@@ -165,6 +179,7 @@ export function useStoreCart(enabled: boolean): StoreCartState {
     cart,
     error,
     refresh: () => void load(),
+    updateCustomerAddresses,
     updateShippingAddress,
     selectShippingRate,
     removeItem,

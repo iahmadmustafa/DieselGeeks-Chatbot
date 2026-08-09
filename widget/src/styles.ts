@@ -814,6 +814,39 @@ export const WIDGET_CSS = `
   color: var(--dg-text);
 }
 
+.dg-cart-shipping-note {
+  margin: 0 0 0.65rem;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--dg-muted);
+}
+
+.dg-cart-billing-same {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--dg-text-secondary);
+  cursor: pointer;
+}
+
+.dg-cart-billing-same input {
+  margin-top: 0.15rem;
+  width: auto;
+  accent-color: var(--dg-accent);
+}
+
+.dg-cart-billing-block {
+  margin-top: 0.65rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
 .dg-cart-address-form {
   display: flex;
   flex-direction: column;

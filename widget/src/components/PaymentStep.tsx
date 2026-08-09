@@ -24,8 +24,18 @@ function splitName(fullName: string): { first_name: string; last_name: string } 
   return { first_name: trimmed.slice(0, spaceIndex), last_name: trimmed.slice(spaceIndex + 1).trim() };
 }
 
-function addressFromShipping(shipping: StoreApiAddress, email: string, fullName: string): StoreApiAddress {
-  return { ...shipping, ...splitName(fullName), email };
+function buildCheckoutBillingAddress(
+  billing: StoreApiAddress,
+  email: string,
+  fullName: string,
+): StoreApiAddress {
+  const names = splitName(fullName);
+  return {
+    ...billing,
+    first_name: names.first_name || billing.first_name,
+    last_name: names.last_name || billing.last_name,
+    email,
+  };
 }
 
 /**
@@ -67,22 +77,19 @@ interface PaymentStepProps {
 /**
  * Stage 3 of in-chat checkout: collects contact details + card via a
  * same-origin-iframe-hosted Stripe Card Element, then submits the order
- * through the Store API's `/checkout` endpoint. Billing address is reused
- * from the shipping address already collected in stage 2 to keep the form
- * short — Diesel Geeks ships within Australia only, so this is a reasonable
- * default rather than a hidden assumption for most shoppers.
+ * through the Store API's `/checkout` endpoint. Shipping and billing come
+ * from stage 2 (billing may match shipping when that checkbox is on).
  */
 export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
   const stripeCard = useStripeCardElement();
   const [email, setEmail] = React.useState(cart.billing_address?.email ?? "");
   const shippingAddress = cart.needs_shipping ? cart.shipping_address : undefined;
-  const nameSource = shippingAddress ?? cart.billing_address;
+  const billingSource = cart.billing_address?.address_1?.trim()
+    ? cart.billing_address
+    : shippingAddress ?? cart.billing_address;
+  const nameSource = billingSource ?? shippingAddress;
   const initialName = [nameSource?.first_name, nameSource?.last_name].filter(Boolean).join(" ").trim();
-  // A dedicated field, prefilled from the shipping address when available
-  // but always independently editable/required here — the shipping form
-  // only requires an address to calculate rates, not a name, so relying on
-  // it alone left the Pay button silently and permanently disabled whenever
-  // a shopper skipped those two optional-looking fields upstream.
+  // Cardholder name — prefilled from the address form, still editable here.
   const [fullName, setFullName] = React.useState(initialName);
   const [status, setStatus] = React.useState<PaymentStatus>("idle");
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -109,7 +116,7 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
   // doesn't work" into an actionable, specific report.
   const blockers: string[] = [];
   if (status === "idle" || status === "error") {
-    if (!nameSource) blockers.push("finish the shipping address step above first");
+    if (!nameSource) blockers.push("finish the address step above first");
     if (!fullName.trim()) blockers.push("enter the name on the card");
     if (!email.trim()) blockers.push("enter an email for your receipt");
     if (stripeCard.status === "loading") blockers.push("payment form is still loading");
@@ -142,27 +149,39 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
     setStatus("submitting");
     setErrorMessage(null);
 
-    // Shipping lives on the server cart, but a slow background `getCart()`
-    // (e.g. from opening the cart view) can race with "Calculate shipping"
-    // and clobber React state with an empty `shipping_address` while rates
-    // still show. Re-read from the Store API right before checkout so the
-    // payload always matches what WooCommerce actually has on file.
+    // Addresses live on the server cart, but a slow background `getCart()`
+    // can race with "Calculate shipping" and clobber React state. Re-read
+    // from the Store API right before checkout so shipping/billing match Woo.
     let shippingSource = cart.needs_shipping ? cart.shipping_address : undefined;
-    if (cart.needs_shipping) {
-      const freshCart = await getCart();
-      if (freshCart.ok && freshCart.cart.shipping_address?.address_1?.trim()) {
+    let billingFromCart = cart.billing_address;
+    const freshCart = await getCart();
+    if (freshCart.ok) {
+      if (cart.needs_shipping && freshCart.cart.shipping_address?.address_1?.trim()) {
         shippingSource = freshCart.cart.shipping_address;
+      }
+      if (freshCart.cart.billing_address?.address_1?.trim()) {
+        billingFromCart = freshCart.cart.billing_address;
       }
     }
 
-    const resolvedNameSource = shippingSource ?? cart.billing_address;
-    if (!resolvedNameSource?.address_1?.trim()) {
+    const resolvedBillingSource =
+      billingFromCart?.address_1?.trim() ? billingFromCart : shippingSource ?? billingFromCart;
+    if (!resolvedBillingSource?.address_1?.trim()) {
+      setStatus("error");
+      setErrorMessage("Please save your address and calculate shipping before paying.");
+      return;
+    }
+    if (cart.needs_shipping && !shippingSource?.address_1?.trim()) {
       setStatus("error");
       setErrorMessage("Please calculate shipping with your full address before paying.");
       return;
     }
 
-    const billingAddress = addressFromShipping(resolvedNameSource, email.trim(), fullName);
+    const billingAddress = buildCheckoutBillingAddress(
+      resolvedBillingSource,
+      email.trim(),
+      fullName,
+    );
 
     const paymentMethodResult = await stripeCard.createPaymentMethod({
       name: fullName,
@@ -185,7 +204,7 @@ export function PaymentStep({ cart, onOrderComplete }: PaymentStepProps) {
 
     const checkoutResult = await submitCheckout({
       billing_address: billingAddress,
-      shipping_address: cart.needs_shipping ? billingAddress : undefined,
+      shipping_address: cart.needs_shipping ? shippingSource : undefined,
       payment_method: "stripe",
       payment_data: buildStripePaymentData(paymentMethodResult.paymentMethodId, billingAddress),
     });

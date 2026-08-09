@@ -18,7 +18,10 @@ interface CartReviewProps {
   error: string | null;
   onRefresh: () => void;
   onBack: () => void;
-  onUpdateAddress: (address: Partial<StoreApiAddress>) => Promise<StoreCartMutationResult>;
+  onUpdateAddresses: (addresses: {
+    shipping_address?: Partial<StoreApiAddress>;
+    billing_address?: Partial<StoreApiAddress>;
+  }) => Promise<StoreCartMutationResult>;
   onSelectRate: (packageId: number | string, rateId: string) => Promise<StoreCartMutationResult>;
   onRemoveItem: (itemKey: string, currentQuantity: number) => Promise<StoreCartMutationResult>;
   /**
@@ -42,7 +45,7 @@ export function CartReview({
   error,
   onRefresh,
   onBack,
-  onUpdateAddress,
+  onUpdateAddresses,
   onSelectRate,
   onRemoveItem,
   embedded = false,
@@ -200,7 +203,11 @@ export function CartReview({
             </ul>
 
             {cart.needs_shipping ? (
-              <CartShippingSection cart={cart} onUpdateAddress={onUpdateAddress} onSelectRate={onSelectRate} />
+              <CartShippingSection
+                cart={cart}
+                onUpdateAddresses={onUpdateAddresses}
+                onSelectRate={onSelectRate}
+              />
             ) : null}
 
             <div className="dg-cart-summary">
