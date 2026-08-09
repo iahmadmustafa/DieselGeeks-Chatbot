@@ -8,9 +8,10 @@
  * `wordpress_logged_in_*` only mean anything to PHP on this site. This file
  * is the bridge: it (1) prints a small config object the widget reads on
  * load, (2) exposes an AJAX identity endpoint, (3) email/password login via
- * wp_signon, and (4) Google Sign-In via Google Identity Services ID tokens
+ * wp_signon, (4) Google Sign-In via Google Identity Services ID tokens
  * verified here (same Client ID as Site Kit) so login never leaves the chat
- * page for /my-account/.
+ * page for /my-account/, and (5) returns storefront account fields so the
+ * widget can refresh the theme header without a full page reload.
  *
  * Deploy (script-tag loader already in place — you only need this one file):
  *   1. Upload this file into the child theme folder.
@@ -77,8 +78,39 @@ function dieselgeeks_chat_get_google_client_id(): string
 }
 
 /**
+ * Account fields the widget uses to refresh the theme header after AJAX
+ * login without a full page reload (Electron Theme .et-login / mobile menu).
+ *
  * @param WP_User $user
- * @return array{loggedIn: bool, token: string, displayName: string}
+ * @return array{
+ *   displayName: string,
+ *   email: string,
+ *   avatarUrl: string,
+ *   accountUrl: string,
+ *   editProfileUrl: string,
+ *   logoutUrl: string
+ * }
+ */
+function dieselgeeks_chat_build_storefront_payload(WP_User $user): array
+{
+    $account_url = function_exists('wc_get_page_permalink')
+        ? (string) wc_get_page_permalink('myaccount')
+        : home_url('/my-account/');
+    $account_url = untrailingslashit($account_url);
+
+    return [
+        'displayName' => $user->display_name,
+        'email' => $user->user_email,
+        'avatarUrl' => (string) get_avatar_url($user->ID, ['size' => 112]),
+        'accountUrl' => $account_url . '/',
+        'editProfileUrl' => $account_url . '/edit-account/',
+        'logoutUrl' => wp_logout_url(home_url('/')),
+    ];
+}
+
+/**
+ * @param WP_User $user
+ * @return array{loggedIn: bool, token: string, displayName: string, storefront: array<string, string>}
  */
 function dieselgeeks_chat_build_identity_response(WP_User $user): array
 {
@@ -97,6 +129,7 @@ function dieselgeeks_chat_build_identity_response(WP_User $user): array
         'loggedIn' => true,
         'token' => $token,
         'displayName' => $user->display_name,
+        'storefront' => dieselgeeks_chat_build_storefront_payload($user),
     ];
 }
 

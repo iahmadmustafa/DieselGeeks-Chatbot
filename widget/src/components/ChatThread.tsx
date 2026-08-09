@@ -204,17 +204,17 @@ export function ChatThread({
                   </div>
                 ) : null}
 
-                        {!isUser && !hideInlineProducts && products.length > 0 ? (
-                          <div className="dg-products">
-                            {products.map((product, index) => (
-                              <ProductCardView
-                                key={product.id}
-                                product={product}
-                                style={{ "--dg-stagger": index } as React.CSSProperties}
-                              />
-                            ))}
-                          </div>
-                        ) : null}
+                {!isUser && !hideInlineProducts && products.length > 0 ? (
+                  <div className="dg-products">
+                    {products.map((product, index) => (
+                      <ProductCardView
+                        key={product.id}
+                        product={product}
+                        style={{ "--dg-stagger": index } as React.CSSProperties}
+                      />
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </div>
           );

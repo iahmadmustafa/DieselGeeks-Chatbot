@@ -5,11 +5,23 @@
  * Kit) and a WP AJAX verifier — never navigates to /my-account/.
  */
 
+/** Theme-header fields from dieselgeeks-chat-identity.php after login. */
+export interface StorefrontLoginUi {
+  displayName: string;
+  email: string;
+  avatarUrl: string;
+  accountUrl: string;
+  editProfileUrl: string;
+  logoutUrl: string;
+}
+
 export interface WpIdentityResult {
   loggedIn: boolean;
   /** Short-lived signed token to forward to our backend so it can trust this identity. Absent when logged out. */
   token: string | null;
   displayName: string | null;
+  /** Present after a successful login/identity response that includes header sync data. */
+  storefront?: StorefrontLoginUi | null;
 }
 
 interface DieselgeeksChatIdentityConfig {
@@ -57,7 +69,29 @@ function getIdentityConfig(): DieselgeeksChatIdentityConfig | null {
   return config;
 }
 
-function parseIdentityResponse(data: Partial<WpIdentityResult> & { loggedIn?: boolean }): WpIdentityResult {
+function parseStorefront(value: unknown): StorefrontLoginUi | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const data = value as Record<string, unknown>;
+  const displayName = typeof data.displayName === "string" ? data.displayName : "";
+  const email = typeof data.email === "string" ? data.email : "";
+  const avatarUrl = typeof data.avatarUrl === "string" ? data.avatarUrl : "";
+  const accountUrl = typeof data.accountUrl === "string" ? data.accountUrl : "";
+  const editProfileUrl = typeof data.editProfileUrl === "string" ? data.editProfileUrl : "";
+  const logoutUrl = typeof data.logoutUrl === "string" ? data.logoutUrl : "";
+
+  if (!displayName || !accountUrl) {
+    return null;
+  }
+
+  return { displayName, email, avatarUrl, accountUrl, editProfileUrl, logoutUrl };
+}
+
+function parseIdentityResponse(
+  data: Partial<WpIdentityResult> & { loggedIn?: boolean; storefront?: unknown },
+): WpIdentityResult {
   if (!data.loggedIn) {
     return LOGGED_OUT_RESULT;
   }
@@ -66,7 +100,86 @@ function parseIdentityResponse(data: Partial<WpIdentityResult> & { loggedIn?: bo
     loggedIn: true,
     token: typeof data.token === "string" ? data.token : null,
     displayName: typeof data.displayName === "string" ? data.displayName : null,
+    storefront: parseStorefront(data.storefront),
   };
+}
+
+/**
+ * Updates the Electron Theme header / mobile account chrome after AJAX login
+ * so the site shows "My account" without a full reload. Uses textContent /
+ * attribute updates only (no HTML injection). Safe no-op if selectors missing.
+ */
+export function syncStorefrontLoginUi(storefront: StorefrontLoginUi | null | undefined): void {
+  if (!storefront || typeof document === "undefined") {
+    return;
+  }
+
+  try {
+    document.documentElement.classList.add("logged-in");
+    document.body.classList.add("logged-in");
+
+    document.querySelectorAll(".et-login .login-title").forEach((node) => {
+      node.classList.remove("login");
+    });
+
+    const accountRoots = document.querySelectorAll<HTMLElement>(
+      ".et-login .logged-in, .et-mobile-container-top .logged-in",
+    );
+
+    accountRoots.forEach((root) => {
+      const infoSpans = root.querySelectorAll<HTMLElement>(".info > span");
+      if (infoSpans[0]) {
+        infoSpans[0].textContent = storefront.displayName;
+      }
+      if (infoSpans[1] && storefront.email) {
+        infoSpans[1].textContent = storefront.email;
+      }
+
+      root.querySelectorAll("img.avatar").forEach((img) => {
+        if (!(img instanceof HTMLImageElement) || !storefront.avatarUrl) {
+          return;
+        }
+        img.src = storefront.avatarUrl;
+        img.removeAttribute("srcset");
+        img.alt = storefront.displayName;
+      });
+
+      root.querySelectorAll<HTMLAnchorElement>('a.et-button[href*="edit-account"]').forEach((link) => {
+        if (storefront.editProfileUrl) {
+          link.href = storefront.editProfileUrl;
+        }
+      });
+
+      root.querySelectorAll<HTMLAnchorElement>("a.et-button").forEach((link) => {
+        const label = (link.textContent ?? "").trim().toLowerCase();
+        if (label === "dashboard" || label === "login") {
+          link.href = storefront.accountUrl;
+          if (label === "login") {
+            link.textContent = "Dashboard";
+          }
+        }
+      });
+    });
+
+    document.querySelectorAll<HTMLAnchorElement>('a[href*="action=logout"]').forEach((link) => {
+      if (storefront.logoutUrl) {
+        link.href = storefront.logoutUrl;
+      }
+    });
+
+    document.querySelectorAll<HTMLAnchorElement>(".my-account-buttons a").forEach((link) => {
+      const href = link.getAttribute("href") ?? "";
+      if (href.includes("action=logout") && storefront.logoutUrl) {
+        link.href = storefront.logoutUrl;
+        return;
+      }
+      if (/\/my-account\/?$/.test(href.replace(/\/+$/, "") + "/") || href.endsWith("/my-account/")) {
+        link.href = storefront.accountUrl;
+      }
+    });
+  } catch (error) {
+    console.warn("[dg-chat] storefront login UI sync skipped", error);
+  }
 }
 
 let cachedResultPromise: Promise<WpIdentityResult> | null = null;

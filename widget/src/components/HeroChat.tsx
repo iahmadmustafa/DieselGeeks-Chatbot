@@ -15,7 +15,7 @@ import {
 import { useStoreCart } from "../use-store-cart";
 import { useMediaQuery } from "../use-media-query";
 import { getAllProductsFromMessages } from "../get-products-from-messages";
-import { getWpIdentity, type WpIdentityResult } from "../wp-identity";
+import { getWpIdentity, syncStorefrontLoginUi, type WpIdentityResult } from "../wp-identity";
 import type { ChatUIMessage } from "../types";
 import { CartReview } from "./CartReview";
 import { BrandLogo } from "./BrandLogo";
@@ -137,12 +137,9 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
     setWpIdentity(identity);
     setShowLoginModal(false);
 
-    // AJAX login sets WP cookies but the theme header still says "Login"
-    // until the page re-renders. After migrating any guest chat, reload so
-    // the storefront (and chat) both show the logged-in state.
-    const reload = () => {
-      window.location.reload();
-    };
+    // Cookies are already set by the WP AJAX login. Refresh chat + theme
+    // header in place — no full reload (see syncStorefrontLoginUi).
+    syncStorefrontLoginUi(identity.storefront);
 
     if (identity.token && messages.length > 0) {
       void saveConversation({
@@ -150,12 +147,14 @@ export function HeroChat({ apiBase, logoUrl }: HeroChatProps) {
         conversationId: sessionId,
         messages,
       })
-        .then(reload)
-        .catch(reload);
+        .then(() => refreshHistory(identity.token!))
+        .catch(() => void refreshHistory(identity.token!));
       return;
     }
 
-    reload();
+    if (identity.token) {
+      void refreshHistory(identity.token);
+    }
   }
 
   const [input, setInput] = React.useState("");
