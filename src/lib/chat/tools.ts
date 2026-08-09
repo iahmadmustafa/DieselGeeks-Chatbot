@@ -75,7 +75,7 @@ export function createChatTools(
     }),
     lookup_order: tool({
       description:
-        "Look up a WooCommerce order status by order number. Guests must provide the checkout email. Signed-in customers can omit email if the order belongs to their account. Use for 'where is my order', order status, or tracking-style questions. Never invent status — only report tool results.",
+        "Look up a WooCommerce order status by order number. Guests must provide the checkout email for THAT order. Signed-in customers may only look up orders on their own account — omit email or pass their account email; never pass a different person's email. Use for 'where is my order' / order status. Never invent status — only report tool results.",
       inputSchema: z.object({
         order_id: z
           .union([z.string(), z.number()])
@@ -85,7 +85,7 @@ export function createChatTools(
           .email()
           .optional()
           .describe(
-            "Billing/checkout email. Required for guests. Optional when the customer is signed in and the order is on their account.",
+            "Billing/checkout email. Required for guests. For signed-in users, only their own account email is allowed (or omit it).",
           ),
       }),
       execute: async (input) =>

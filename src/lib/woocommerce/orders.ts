@@ -185,9 +185,16 @@ async function fetchOrdersByCustomer(customerId: number, perPage = 5): Promise<W
   return (await response.json()) as WooOrderRaw[];
 }
 
+const ORDER_NOT_YOURS_MESSAGE =
+  "No matching order was found for that order number and email. Check both, or sign in with the account used at checkout.";
+
 /**
- * Guest or logged-in lookup. Always requires order id + email match unless
- * the signed-in WP user owns the order (customer_id or billing email).
+ * Guest or logged-in lookup.
+ *
+ * - Guests: order number + checkout email must match the order.
+ * - Signed-in: only orders owned by that account (WP customer id or the
+ *   account's own billing email). A different email in the tool args is
+ *   ignored/rejected so users can't pivot to someone else's order mid-chat.
  */
 export async function lookupOrder(options: {
   orderId: string | number;
@@ -206,13 +213,23 @@ export async function lookupOrder(options: {
   const providedEmail = options.email ? normalizeEmail(options.email) : "";
   const identityEmail = options.identity?.email ? normalizeEmail(options.identity.email) : "";
   const identityUserId = options.identity?.wpUserId ?? null;
+  const isSignedIn = Boolean(identityUserId && identityEmail);
 
-  if (!providedEmail && !identityUserId) {
+  if (!isSignedIn && !providedEmail) {
     return {
       ok: false,
       error: "invalid_input",
       message:
         "To look up an order, ask for the order number and the email used at checkout, or ask the customer to sign in.",
+    };
+  }
+
+  // Signed-in users may only query with their own email (or omit it).
+  if (isSignedIn && providedEmail && providedEmail !== identityEmail) {
+    return {
+      ok: false,
+      error: "email_mismatch",
+      message: ORDER_NOT_YOURS_MESSAGE,
     };
   }
 
@@ -243,15 +260,19 @@ export async function lookupOrder(options: {
     order.customer_id > 0 &&
     order.customer_id === identityUserId;
   const ownsByIdentityEmail = Boolean(identityEmail && orderEmail && identityEmail === orderEmail);
-  const ownsByProvidedEmail = Boolean(providedEmail && orderEmail && providedEmail === orderEmail);
+  const ownsByGuestEmail =
+    !isSignedIn && Boolean(providedEmail && orderEmail && providedEmail === orderEmail);
 
-  if (!ownsAsCustomer && !ownsByIdentityEmail && !ownsByProvidedEmail) {
-    // Same generic wording as not_found — don't reveal that the order exists.
+  const allowed = isSignedIn
+    ? ownsAsCustomer || ownsByIdentityEmail
+    : ownsByGuestEmail;
+
+  if (!allowed) {
+    // Same generic wording — don't reveal that the order exists for another email.
     return {
       ok: false,
       error: "email_mismatch",
-      message:
-        "No matching order was found for that order number and email. Check both, or sign in with the account used at checkout.",
+      message: ORDER_NOT_YOURS_MESSAGE,
     };
   }
 

@@ -96,6 +96,55 @@ describe("lookupOrder / listMyOrders", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("blocks signed-in users from looking up someone else's order via that email", async () => {
+    vi.stubEnv("WOOCOMMERCE_URL", "https://example.com");
+    vi.stubEnv("WOOCOMMERCE_CONSUMER_KEY", "ck");
+    vi.stubEnv("WOOCOMMERCE_CONSUMER_SECRET", "cs");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => sampleOrder,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await lookupOrder({
+      orderId: 15956,
+      email: "sam@example.com",
+      identity: { wpUserId: 99, email: "ahmad@placentek.com" },
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("email_mismatch");
+    }
+    // Reject before Woo fetch when a foreign email is supplied while signed in.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks signed-in users from guest orders that are not theirs", async () => {
+    vi.stubEnv("WOOCOMMERCE_URL", "https://example.com");
+    vi.stubEnv("WOOCOMMERCE_CONSUMER_KEY", "ck");
+    vi.stubEnv("WOOCOMMERCE_CONSUMER_SECRET", "cs");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => sampleOrder,
+      }),
+    );
+
+    const result = await lookupOrder({
+      orderId: 15956,
+      identity: { wpUserId: 99, email: "ahmad@placentek.com" },
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("email_mismatch");
+    }
+  });
+
   it("requires login for list_my_orders", async () => {
     const result = await listMyOrders({ identity: null });
     expect(result.ok).toBe(false);
