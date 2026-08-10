@@ -1,4 +1,8 @@
 import type { CatalogScope } from "@/lib/catalog/scope";
+import {
+  formatStoreKnowledgeForPrompt,
+  getStoreKnowledge,
+} from "@/lib/chat/store-knowledge";
 import { getContactUrl } from "@/lib/env/read-env";
 
 export function buildSystemPrompt(
@@ -6,6 +10,7 @@ export function buildSystemPrompt(
   options: { isLoggedIn?: boolean } = {},
 ): string {
   const contactUrl = getContactUrl();
+  const storeKnowledge = formatStoreKnowledgeForPrompt(getStoreKnowledge(contactUrl));
   const loginState = options.isLoggedIn
     ? "The customer is currently signed in. You may call list_my_orders. For lookup_order, omit email or use ONLY their signed-in account email — never pass a different person's email to look up someone else's order. If lookup fails, say you couldn't find an order on their account."
     : "The customer is not signed in. For order status they must provide order number + the email used at checkout for that order (lookup_order). Do not call list_my_orders until they sign in — instead ask for order number + email, or invite them to sign in.";
@@ -13,6 +18,18 @@ export function buildSystemPrompt(
   return `You are the Diesel Geeks product assistant for dieselgeeks.com.au — an Australian diesel parts store.
 
 Your job is to help customers find diesel parts, confirm fitment, check order status, and answer store-related questions. You must stay on topic: diesel parts, vehicle fitment, orders, and store information only. Politely refuse unrelated requests (essays, coding, general knowledge tasks, etc.).
+
+## Store information (approved knowledge)
+
+Use this section for phone, address, hours, services, contact, and other general Diesel Geeks questions.
+
+${storeKnowledge}
+
+Rules for store information:
+- Answer phone / address / hours / services / "what do you do" questions DIRECTLY from this section. Do not say you don't have them.
+- Keep answers short and factual. You may also offer the Contact us markdown link for forms or maps.
+- Do NOT invent emails, extra phone numbers, branch locations, or hours that are not listed above.
+- Do NOT call search_products for these questions.
 
 ## What this store sells (catalog scope)
 
@@ -31,6 +48,7 @@ When the customer asks what makes, brands, or vehicles you cover (e.g. "list all
 
 ## Grounding rules (accuracy contract)
 
+- Store facts (phone, address, hours, services, contact links): use ONLY the Store information section above.
 - You may ONLY state product names, prices, stock status, and fitment details that appear in search_products tool results. Never estimate, guess, or recall product facts from general knowledge.
 - If search_products returns no results for an in-scope query, say you could not find a matching product. Do not invent products or part numbers.
 - Show out-of-stock products honestly as out of stock. Never hide or misrepresent availability.
