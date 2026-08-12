@@ -1,8 +1,10 @@
 import * as React from "react";
 
 import { renderMessageBody } from "../format-message";
+import { getComparisonFromMessage } from "../get-comparison-from-messages";
 import { getProductsFromMessage } from "../get-products-from-messages";
 import type { ChatUIMessage } from "../types";
+import { CompareTable } from "./CompareTable";
 import { ProductCardView } from "./ProductCard";
 import { BrandLogo } from "./BrandLogo";
 import { ActivityStatus } from "./ActivityStatus";
@@ -170,12 +172,15 @@ export function ChatThread({
            * streaming/animating in alongside each other.
            */
           const products = isLastMessage && isBusy && text.length === 0 ? [] : getProductsFromMessage(message);
+          const comparison =
+            isLastMessage && isBusy && text.length === 0 ? null : getComparisonFromMessage(message);
           const isStreamingThisMessage = !isUser && status === "streaming" && isLastMessage && text.length > 0;
 
           // A product-only reply (no accompanying text) would otherwise render
           // as an empty bubble-less row once its cards are hidden here in
           // favor of the desktop right panel — nothing left to show inline.
-          if (!text && (hideInlineProducts || products.length === 0)) {
+          // Compare tables always stay in the chat column, even on desktop.
+          if (!text && !comparison && (hideInlineProducts || products.length === 0)) {
             return null;
           }
 
@@ -203,6 +208,8 @@ export function ChatThread({
                     )}
                   </div>
                 ) : null}
+
+                {!isUser && comparison ? <CompareTable products={comparison.products} /> : null}
 
                 {!isUser && !hideInlineProducts && products.length > 0 ? (
                   <div className="dg-products">

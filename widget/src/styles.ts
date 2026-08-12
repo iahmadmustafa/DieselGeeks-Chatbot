@@ -1505,6 +1505,129 @@ export const WIDGET_CSS = `
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* ---------- Compare (inline in chat column) ---------- */
+
+.dg-compare {
+  width: 100%;
+  margin-top: 0.35rem;
+  border-radius: var(--dg-radius-lg);
+  border: 1px solid var(--dg-border);
+  background: var(--dg-surface-2);
+  overflow: hidden;
+  animation: dg-product-card-in 480ms var(--dg-ease-out) forwards;
+}
+
+.dg-compare-scroll {
+  display: grid;
+  gap: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dg-compare-cols-2 .dg-compare-scroll {
+  grid-template-columns: repeat(2, minmax(148px, 1fr));
+}
+
+.dg-compare-cols-3 .dg-compare-scroll {
+  grid-template-columns: repeat(3, minmax(136px, 1fr));
+}
+
+.dg-compare-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  min-width: 0;
+  border-right: 1px solid var(--dg-border);
+}
+
+.dg-compare-col:last-child {
+  border-right: none;
+}
+
+.dg-compare-image-wrap {
+  width: 100%;
+  aspect-ratio: 1;
+  max-height: 120px;
+  border-radius: var(--dg-radius-md);
+  overflow: hidden;
+  background: #0c0e11;
+  border: 1px solid var(--dg-border);
+}
+
+.dg-compare-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dg-compare-image-fallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--dg-muted);
+  font-size: 0.64rem;
+}
+
+.dg-compare-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--dg-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 3.1em;
+}
+
+.dg-compare-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--dg-border);
+}
+
+.dg-compare-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dg-muted);
+}
+
+.dg-compare-value {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--dg-text);
+  word-break: break-word;
+}
+
+.dg-compare-row-fitment .dg-compare-value {
+  font-size: 0.7rem;
+  color: var(--dg-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.dg-compare-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: auto;
+  padding-top: 0.35rem;
+}
+
+.dg-compare-actions .dg-btn {
+  width: 100%;
+  justify-content: center;
+}
+
 /* ---------- Products ---------- */
 
 .dg-products {

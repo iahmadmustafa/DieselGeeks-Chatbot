@@ -130,6 +130,16 @@ export function DotsIcon({ className, size = 14 }: IconProps) {
   );
 }
 
+export function CompareIcon({ className, size = 14 }: IconProps) {
+  return (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="4" y="4" width="6.5" height="16" rx="1.2" stroke="currentColor" strokeWidth="1.6" />
+      <rect x="13.5" y="4" width="6.5" height="16" rx="1.2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M6.5 9h1.5M6.5 13h1.5M16 9h1.5M16 13h1.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function HeartIcon({ className, size = 14, filled = false }: IconProps & { filled?: boolean }) {
   return (
     <svg

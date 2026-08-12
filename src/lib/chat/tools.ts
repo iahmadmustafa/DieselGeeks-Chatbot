@@ -2,6 +2,7 @@ import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
 import type { WpIdentity } from "@/lib/auth/wp-identity";
+import { compareProducts } from "@/lib/chat/compare-products";
 import { enrichSearchResult, extractCatalogScope } from "@/lib/catalog/scope";
 import { searchProducts } from "@/lib/search/search-products";
 import { listMyOrders, lookupOrder } from "@/lib/woocommerce/orders";
@@ -112,6 +113,31 @@ export function createChatTools(
           identity,
           limit: input.limit,
         }),
+    }),
+    compare_products: tool({
+      description:
+        "Build a side-by-side comparison of 2–3 catalog products. Use when the customer asks to compare parts (e.g. 'compare these two', 'compare A vs B'). Prefer product_id from earlier search_products results when available; otherwise sku or title_or_query. The UI renders the comparison table — do not paste a markdown table. If products are unclear, ask first instead of calling this tool.",
+      inputSchema: z.object({
+        items: z
+          .array(
+            z.object({
+              product_id: z
+                .number()
+                .int()
+                .optional()
+                .describe("WooCommerce product id from a prior search_products result."),
+              sku: z.string().optional().describe("Exact SKU when known."),
+              title_or_query: z
+                .string()
+                .optional()
+                .describe("Product title fragment or search text when id/sku are unknown."),
+            }),
+          )
+          .min(2)
+          .max(3)
+          .describe("Exactly 2 or 3 products to compare."),
+      }),
+      execute: async (input) => compareProducts(snapshot.products, input.items),
     }),
   };
 }

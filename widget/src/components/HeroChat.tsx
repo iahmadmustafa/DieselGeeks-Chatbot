@@ -27,6 +27,7 @@ import {
   ChatBubbleIcon,
   ClipboardIcon,
   CloseIcon,
+  CompareIcon,
   DotsIcon,
   PlusIcon,
   SparkleIcon,
@@ -43,6 +44,11 @@ const MAX_MESSAGE_LENGTH = 500;
 
 const QUICK_ACTIONS: { label: string; prompt: string; icon: (props: { size?: number }) => React.ReactElement }[] = [
   { label: "Find Parts", prompt: "Help me find a part for my vehicle", icon: WrenchIcon },
+  {
+    label: "Compare Parts",
+    prompt: "I want to compare parts. Ask me which 2 or 3 products to compare.",
+    icon: CompareIcon,
+  },
   { label: "Services", prompt: "What services do you offer?", icon: ToolsIcon },
   { label: "Order Support", prompt: "I need help with an existing order", icon: ClipboardIcon },
   { label: "Shipping Info", prompt: "What are your shipping options and how much do they cost?", icon: TruckIcon },

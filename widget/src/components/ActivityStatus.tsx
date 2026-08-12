@@ -3,8 +3,20 @@ import * as React from "react";
 import type { ChatUIMessage } from "../types";
 import { BrandLogo } from "./BrandLogo";
 
-type StepId = "thinking" | "checking" | "searching" | "makes" | "orders" | "writing";
-type KnownTool = "search_products" | "list_catalog_makes" | "lookup_order" | "list_my_orders";
+type StepId =
+  | "thinking"
+  | "checking"
+  | "searching"
+  | "makes"
+  | "orders"
+  | "comparing"
+  | "writing";
+type KnownTool =
+  | "search_products"
+  | "list_catalog_makes"
+  | "lookup_order"
+  | "list_my_orders"
+  | "compare_products";
 
 interface ActivityStep {
   id: StepId;
@@ -25,6 +37,7 @@ const STEP_LABELS: Record<StepId, string> = {
   searching: "Searching the catalog",
   makes: "Looking up vehicles",
   orders: "Checking your order",
+  comparing: "Comparing products",
   writing: "Preparing your answer",
 };
 
@@ -66,6 +79,7 @@ export function deriveActivitySteps(
   const orderPart =
     parts.find((part) => isToolPart(part, "lookup_order")) ??
     parts.find((part) => isToolPart(part, "list_my_orders"));
+  const comparePart = parts.find((part) => isToolPart(part, "compare_products"));
 
   const searchActive = searchPart ? isToolInProgress(searchPart) : false;
   const searchDone = searchPart ? isToolDone(searchPart) : false;
@@ -73,10 +87,12 @@ export function deriveActivitySteps(
   const makesDone = makesPart ? isToolDone(makesPart) : false;
   const ordersActive = orderPart ? isToolInProgress(orderPart) : false;
   const ordersDone = orderPart ? isToolDone(orderPart) : false;
+  const compareActive = comparePart ? isToolInProgress(comparePart) : false;
+  const compareDone = comparePart ? isToolDone(comparePart) : false;
 
-  const anyToolSeen = Boolean(searchPart || makesPart || orderPart);
-  const anyToolActive = searchActive || makesActive || ordersActive;
-  const anyToolDone = searchDone || makesDone || ordersDone;
+  const anyToolSeen = Boolean(searchPart || makesPart || orderPart || comparePart);
+  const anyToolActive = searchActive || makesActive || ordersActive || compareActive;
+  const anyToolDone = searchDone || makesDone || ordersDone || compareDone;
 
   let activeId: StepId;
 
@@ -84,6 +100,8 @@ export function deriveActivitySteps(
     activeId = "thinking";
   } else if (ordersActive) {
     activeId = "orders";
+  } else if (compareActive) {
+    activeId = "comparing";
   } else if (searchActive) {
     activeId = "searching";
   } else if (makesActive) {
@@ -95,7 +113,13 @@ export function deriveActivitySteps(
   } else if (status === "submitted" && softAdvanced) {
     activeId = "checking";
   } else if (anyToolActive) {
-    activeId = searchActive ? "searching" : makesActive ? "makes" : "orders";
+    activeId = searchActive
+      ? "searching"
+      : makesActive
+        ? "makes"
+        : compareActive
+          ? "comparing"
+          : "orders";
   } else {
     activeId = "checking";
   }
@@ -107,6 +131,7 @@ export function deriveActivitySteps(
     activeId === "searching" ||
     activeId === "makes" ||
     activeId === "orders" ||
+    activeId === "comparing" ||
     activeId === "writing" ||
     softAdvanced ||
     status === "streaming"
@@ -124,6 +149,10 @@ export function deriveActivitySteps(
 
   if (orderPart || activeId === "orders") {
     sequence.push({ id: "orders", label: STEP_LABELS.orders });
+  }
+
+  if (comparePart || activeId === "comparing") {
+    sequence.push({ id: "comparing", label: STEP_LABELS.comparing });
   }
 
   if (activeId === "writing" || (anyToolDone && !hasText)) {

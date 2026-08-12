@@ -13,6 +13,21 @@ export interface ProductCard {
   fitment_summary: string | null;
 }
 
+/** One product the model wants to include in a side-by-side compare. */
+export interface CompareProductRef {
+  product_id?: number;
+  sku?: string;
+  title_or_query?: string;
+}
+
+export interface CompareProductsResult {
+  ok: boolean;
+  products: ProductCard[];
+  unresolved: string[];
+  ambiguous: string[];
+  error: string | null;
+}
+
 export type SearchMatchType = "part_number" | "structured" | "keyword" | "none";
 
 export interface SearchProductsParams {
