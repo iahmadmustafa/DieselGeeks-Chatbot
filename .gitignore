@@ -21,3 +21,7 @@ coverage/
 
 # dumps
 context/fitment-dump.json
+
+# local eval / debug scratch (must not ship to Vercel typecheck)
+tmp/
+tmp-*.json
