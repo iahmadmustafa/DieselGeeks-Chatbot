@@ -161,4 +161,55 @@ Isuzu MU-X: 2012–2016`,
     expect(result.match_type).toBe("none");
     expect(result.result_count).toBe(0);
   });
+
+  it("expands SCV to suction control valve for keyword search", () => {
+    const withScv = [
+      ...catalog,
+      makeProduct({
+        id: 5,
+        sku: "8-98145455-1",
+        title: "8-98145455-1 Suction Control Valve for Isuzu 4JJ1 Engines",
+        price: "163.00",
+        fitment: {
+          makes: ["Isuzu"],
+          models: ["D-Max"],
+          engine_codes: ["4JJ1"],
+          fuel_type: "Diesel",
+          fuel_system: "Common Rail",
+          year_ranges: { "D-Max": { from: 2007, to: 2016 } },
+          notes: null,
+        },
+      }),
+    ];
+
+    const byAbbr = searchProducts(withScv, { keyword: "4JJ1 SCV" });
+    expect(byAbbr.match_type).toBe("keyword");
+    expect(byAbbr.products.some((product) => product.id === 5)).toBe(true);
+  });
+
+  it("expands HPFP to high pressure fuel pump for keyword search", () => {
+    const withPump = [
+      ...catalog,
+      makeProduct({
+        id: 6,
+        sku: "A2C9321760080",
+        title: "Genuine High-Pressure Fuel Pump – A2C9321760080 for Ford Ranger",
+        price: "900.00",
+        fitment_expected: true,
+        fitment: {
+          makes: ["Ford"],
+          models: ["Ranger"],
+          engine_codes: [],
+          fuel_type: "Diesel",
+          fuel_system: "Common Rail",
+          year_ranges: {},
+          notes: null,
+        },
+      }),
+    ];
+
+    const byAbbr = searchProducts(withPump, { keyword: "Ranger HPFP" });
+    expect(byAbbr.match_type).toBe("keyword");
+    expect(byAbbr.products.some((product) => product.id === 6)).toBe(true);
+  });
 });

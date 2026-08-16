@@ -10,6 +10,24 @@ import type {
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
 
+/**
+ * Tiny curated customer jargon → catalog wording. Replace (do not append) so
+ * keyword scoring's all-tokens rule still works for titles that lack the abbr.
+ */
+const SEARCH_SYNONYMS: Array<{ pattern: RegExp; replacement: string }> = [
+  { pattern: /\bscv\b/gi, replacement: "suction control valve" },
+  { pattern: /\bhpfp\b/gi, replacement: "high pressure fuel pump" },
+];
+
+/** Expand known part abbreviations in a free-text search query. */
+export function expandSearchSynonyms(query: string): string {
+  let expanded = query;
+  for (const rule of SEARCH_SYNONYMS) {
+    expanded = expanded.replace(rule.pattern, rule.replacement);
+  }
+  return expanded.replace(/\s+/g, " ").trim();
+}
+
 function normalizePartNumber(value: string): string {
   return value.trim().toLowerCase().replace(/[\s-]+/g, "");
 }
@@ -236,10 +254,11 @@ function keywordScore(corpus: string, query: string): number {
 }
 
 function buildKeywordQuery(params: SearchProductsParams): string {
-  return [params.keyword, params.make, params.model, params.engine_code]
+  const raw = [params.keyword, params.make, params.model, params.engine_code]
     .filter((value): value is string => Boolean(value?.trim()))
     .join(" ")
     .trim();
+  return expandSearchSynonyms(raw);
 }
 
 function rankKeywordMatches(
