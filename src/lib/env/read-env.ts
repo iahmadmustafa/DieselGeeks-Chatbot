@@ -200,6 +200,20 @@ export function getChatEstimatedCostPerRequestUsd(): number {
   );
 }
 
+/** Optional Braintrust API key — when unset, chat tracing is a no-op. */
+export function getBraintrustApiKey(): string | null {
+  return readEnvLocalValue("BRAINTRUST_API_KEY") ?? readEnv("BRAINTRUST_API_KEY");
+}
+
+/** Braintrust project name for chat traces (default dieselgeeks-chat). */
+export function getBraintrustProject(): string {
+  return (
+    readEnvLocalValue("BRAINTRUST_PROJECT") ??
+    readEnv("BRAINTRUST_PROJECT") ??
+    "dieselgeeks-chat"
+  );
+}
+
 export interface TokenUsageLike {
   inputTokens?: number;
   outputTokens?: number;

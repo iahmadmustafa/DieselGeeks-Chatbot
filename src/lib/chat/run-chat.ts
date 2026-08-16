@@ -4,10 +4,10 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
   stepCountIs,
-  streamText,
 } from "ai";
 
 import type { WpIdentity } from "@/lib/auth/wp-identity";
+import { streamText, withChatTrace } from "@/lib/chat/braintrust";
 import { previewText, trimChatHistory } from "@/lib/chat/guardrails";
 import { extractCatalogScope } from "@/lib/catalog/scope";
 import { buildSystemPrompt } from "@/lib/chat/system-prompt";
@@ -99,51 +99,60 @@ export async function runChat(options: {
     },
     execute: async ({ writer }) => {
       try {
-        const result = streamText({
-          model: createChatModel(),
-          system: buildSystemPrompt(catalogScope, {
+        await withChatTrace(
+          {
+            sessionId: options.sessionId,
+            wpUserId: options.identity?.wpUserId ?? null,
             isLoggedIn: Boolean(options.identity),
-          }),
-          messages: await convertToModelMessages(trimmedMessages, { tools }),
-          tools,
-          stopWhen: stepCountIs(5),
-          maxOutputTokens: getChatMaxOutputTokens(),
-          providerOptions: {
-            openai: {
-              reasoningEffort: "low",
-              reasoningSummary: null,
-            },
           },
-          onStepEnd: ({ text }) => {
-            if (text) {
-              assistantText += text;
-            }
-          },
-          onFinish: async ({ usage }) => {
-            try {
-              const budgetStatus = await recordChatSpend({
-                inputTokens: usage.inputTokens,
-                outputTokens: usage.outputTokens,
+          async () => {
+            const result = streamText({
+              model: createChatModel(),
+              system: buildSystemPrompt(catalogScope, {
+                isLoggedIn: Boolean(options.identity),
+              }),
+              messages: await convertToModelMessages(trimmedMessages, { tools }),
+              tools,
+              stopWhen: stepCountIs(5),
+              maxOutputTokens: getChatMaxOutputTokens(),
+              providerOptions: {
+                openai: {
+                  reasoningEffort: "low",
+                  reasoningSummary: null,
+                },
+              },
+              onStepEnd: ({ text }) => {
+                if (text) {
+                  assistantText += text;
+                }
+              },
+              onFinish: async ({ usage }) => {
+                try {
+                  const budgetStatus = await recordChatSpend({
+                    inputTokens: usage.inputTokens,
+                    outputTokens: usage.outputTokens,
+                  });
+                  if (budgetStatus.spentUsd >= budgetStatus.limitUsd * 0.8) {
+                    console.warn("[guardrails] daily budget nearing limit", budgetStatus);
+                  }
+                } catch (error) {
+                  console.error("[guardrails] failed to record chat spend", error);
+                }
+              },
+            });
+
+            writer.merge(result.toUIMessageStream());
+            await result.consumeStream();
+
+            if (collectedProducts.length > 0) {
+              writer.write({
+                type: "data-products",
+                id: "products",
+                data: collectedProducts,
               });
-              if (budgetStatus.spentUsd >= budgetStatus.limitUsd * 0.8) {
-                console.warn("[guardrails] daily budget nearing limit", budgetStatus);
-              }
-            } catch (error) {
-              console.error("[guardrails] failed to record chat spend", error);
             }
           },
-        });
-
-        writer.merge(result.toUIMessageStream());
-        await result.consumeStream();
-
-        if (collectedProducts.length > 0) {
-          writer.write({
-            type: "data-products",
-            id: "products",
-            data: collectedProducts,
-          });
-        }
+        );
       } catch (error) {
         console.error("[run-chat] execute failed", error);
         throw error;

@@ -29,6 +29,7 @@
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "ai": "^7.0.16",
+    "braintrust": "^3.27.0",
     "next": "^15.5.20",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
