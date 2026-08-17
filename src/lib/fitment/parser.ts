@@ -279,7 +279,8 @@ export function parseFitmentDeterministic(raw: string): FitmentParseResult {
 
     if (collectingListField === "models") {
       const cleaned = line.replace(/[^\w\s().+/-]/g, "").trim();
-      if (cleaned) {
+      // Skip stray encoding junk (e.g. lone "A" from broken HTML entities).
+      if (cleaned && /[A-Za-z]{2,}/.test(cleaned)) {
         fitment.models = mergeUniqueValues(fitment.models, [cleaned]);
         sawStructuredField = true;
         continue;
