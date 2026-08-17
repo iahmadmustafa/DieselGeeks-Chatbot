@@ -319,7 +319,17 @@ export function searchProducts(
 
   const keywordQuery = buildKeywordQuery(params);
   if (keywordQuery) {
-    const keywordMatches = rankKeywordMatches(products, keywordQuery);
+    let keywordMatches = rankKeywordMatches(products, keywordQuery);
+
+    // If the customer gave a build year, never reintroduce products via keyword
+    // fallback that fail the year constraint (structured miss → keyword used to
+    // drop the year and return wrong-year parts).
+    if (params.year != null) {
+      keywordMatches = keywordMatches.filter((product) =>
+        matchesYear(product.fitment, params.year!, stripHtml(product.fitment_raw)),
+      );
+    }
+
     if (keywordMatches.length > 0) {
       return finalizeResult(keywordMatches, "keyword", effectiveLimit);
     }

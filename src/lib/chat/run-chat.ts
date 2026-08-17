@@ -104,6 +104,7 @@ export async function runChat(options: {
             sessionId: options.sessionId,
             wpUserId: options.identity?.wpUserId ?? null,
             isLoggedIn: Boolean(options.identity),
+            userMessagePreview: userPreview,
           },
           async () => {
             const result = streamText({

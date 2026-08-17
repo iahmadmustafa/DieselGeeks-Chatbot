@@ -162,6 +162,16 @@ Isuzu MU-X: 2012–2016`,
     expect(result.result_count).toBe(0);
   });
 
+  it("does not keyword-fallback into wrong-year products", () => {
+    const result = searchProducts(catalog, {
+      make: "Isuzu",
+      model: "D-Max",
+      engine_code: "4JJ1",
+      year: 2000,
+    });
+    expect(result.products.some((product) => product.id === 2)).toBe(false);
+  });
+
   it("expands SCV to suction control valve for keyword search", () => {
     const withScv = [
       ...catalog,
