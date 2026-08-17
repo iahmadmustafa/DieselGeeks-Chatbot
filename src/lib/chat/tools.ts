@@ -55,12 +55,12 @@ export function createChatTools(
   return {
     list_catalog_makes: tool({
       description:
-        "List distinct vehicle makes from parsed product fitment data in the catalog snapshot. Use when the customer asks what makes, brands, or vehicles the store covers (e.g. 'list all makes', 'what vehicles do you support'). Returns only makes from product.fitment.makes — not categories or general knowledge.",
+        "List primary vehicle makes the store covers for customers (makes with multiple products in fitment data). Use when the customer asks what makes, brands, or vehicles the store covers (e.g. 'list all makes', 'what vehicles do you support'). Do not invent makes — only return this tool's list.",
       inputSchema: z.object({}),
       execute: async () => ({
-        makes: catalogScope.makes,
-        make_count: catalogScope.makes.length,
-        data_source: "product.fitment.makes from catalog snapshot",
+        makes: catalogScope.listedMakes,
+        make_count: catalogScope.listedMakes.length,
+        data_source: "product.fitment.makes from catalog snapshot (2+ products)",
       }),
     }),
     search_products: tool({

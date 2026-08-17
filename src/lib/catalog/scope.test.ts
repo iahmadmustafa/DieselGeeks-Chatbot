@@ -41,6 +41,19 @@ describe("catalog scope", () => {
   const scope = extractCatalogScope([
     makeCatalogProduct(),
     makeCatalogProduct({
+      id: 11,
+      title: "Isuzu 4JJ1 SCV",
+      fitment: {
+        makes: ["Isuzu"],
+        models: ["D-Max"],
+        engine_codes: ["4JJ1"],
+        fuel_type: "Diesel",
+        fuel_system: "Common Rail",
+        year_ranges: {},
+        notes: null,
+      },
+    }),
+    makeCatalogProduct({
       id: 2,
       title: "Toyota Hilux 1KD Injector Set",
       fitment: {
@@ -50,6 +63,19 @@ describe("catalog scope", () => {
         fuel_type: "Diesel",
         fuel_system: "Common Rail",
         year_ranges: { Hilux: { from: 2005, to: 2015 } },
+        notes: null,
+      },
+    }),
+    makeCatalogProduct({
+      id: 22,
+      title: "Toyota Hilux 1KD Fuel Lines",
+      fitment: {
+        makes: ["Toyota"],
+        models: ["Hilux"],
+        engine_codes: ["1KD"],
+        fuel_type: "Diesel",
+        fuel_system: "Common Rail",
+        year_ranges: {},
         notes: null,
       },
     }),
@@ -73,7 +99,72 @@ describe("catalog scope", () => {
 
   it("extracts makes and models from the catalog", () => {
     expect(scope.makes).toEqual(expect.arrayContaining(["Isuzu", "Toyota"]));
+    expect(scope.listedMakes).toEqual(["Isuzu", "Toyota"]);
     expect(scope.models).toEqual(expect.arrayContaining(["D-Max", "Hilux"]));
+  });
+
+  it("omits one-off makes from listedMakes while keeping them in makes for scope checks", () => {
+    const nicheScope = extractCatalogScope([
+      makeCatalogProduct(),
+      makeCatalogProduct({
+        id: 11,
+        title: "Isuzu 4JJ1 SCV",
+        fitment: {
+          makes: ["Isuzu"],
+          models: ["D-Max"],
+          engine_codes: ["4JJ1"],
+          fuel_type: "Diesel",
+          fuel_system: "Common Rail",
+          year_ranges: {},
+          notes: null,
+        },
+      }),
+      makeCatalogProduct({
+        id: 2,
+        title: "Toyota Hilux 1KD Injector Set",
+        fitment: {
+          makes: ["Toyota"],
+          models: ["Hilux"],
+          engine_codes: ["1KD"],
+          fuel_type: "Diesel",
+          fuel_system: "Common Rail",
+          year_ranges: {},
+          notes: null,
+        },
+      }),
+      makeCatalogProduct({
+        id: 22,
+        title: "Toyota Hilux 1KD Fuel Lines",
+        fitment: {
+          makes: ["Toyota"],
+          models: ["Hilux"],
+          engine_codes: ["1KD"],
+          fuel_type: "Diesel",
+          fuel_system: "Common Rail",
+          year_ranges: {},
+          notes: null,
+        },
+      }),
+      makeCatalogProduct({
+        id: 3,
+        title: "DD15 SCV",
+        fitment: {
+          makes: ["Detroit Diesel"],
+          models: ["DD15"],
+          engine_codes: ["DD15"],
+          fuel_type: "Diesel",
+          fuel_system: "Common Rail",
+          year_ranges: {},
+          notes: null,
+        },
+      }),
+    ]);
+
+    expect(nicheScope.makes).toEqual(
+      expect.arrayContaining(["Detroit Diesel", "Isuzu", "Toyota"]),
+    );
+    expect(nicheScope.listedMakes).toEqual(["Isuzu", "Toyota"]);
+    expect(nicheScope.listedMakes).not.toContain("Detroit Diesel");
   });
 
   it("derives makes only from parsed fitment.makes, not titles or categories", () => {

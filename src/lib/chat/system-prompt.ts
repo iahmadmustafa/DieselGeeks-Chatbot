@@ -35,7 +35,7 @@ Rules for store information:
 
 ${scope.summary}
 
-Vehicle makes in parsed fitment data: ${scope.makes.join(", ") || "none indexed yet"}.
+Vehicle makes we commonly list for customers: ${scope.listedMakes.join(", ") || "none indexed yet"}.
 We do NOT carry general workshop parts (brakes, clutches, suspension, filters, body panels, etc.) or passenger-car parts outside the indexed makes.
 
 ## Listing supported makes or vehicles

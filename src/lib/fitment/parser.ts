@@ -208,6 +208,8 @@ export function parseFitmentDeterministic(raw: string): FitmentParseResult {
 
   const fitment = emptyFitment();
   let inYearRangeSection = false;
+  /** Collect model/make lines after a blank "Models:" / "Make:" label (common HTML list pattern). */
+  let collectingListField: "models" | "makes" | null = null;
   let sawStructuredField = false;
   const unparsedLines: string[] = [];
 
@@ -219,6 +221,17 @@ export function parseFitmentDeterministic(raw: string): FitmentParseResult {
 
       sawStructuredField = true;
       inYearRangeSection = key === "year range" || key === "model years";
+      collectingListField = null;
+
+      if (!value && (key === "models" || key === "model")) {
+        collectingListField = "models";
+        continue;
+      }
+
+      if (!value && key === "make") {
+        collectingListField = "makes";
+        continue;
+      }
 
       if (!value && key !== "year range" && key !== "model years") {
         unparsedLines.push(line);
@@ -264,12 +277,31 @@ export function parseFitmentDeterministic(raw: string): FitmentParseResult {
       continue;
     }
 
+    if (collectingListField === "models") {
+      const cleaned = line.replace(/[^\w\s().+/-]/g, "").trim();
+      if (cleaned) {
+        fitment.models = mergeUniqueValues(fitment.models, [cleaned]);
+        sawStructuredField = true;
+        continue;
+      }
+    }
+
+    if (collectingListField === "makes") {
+      const parts = splitListValue(line);
+      if (parts.length > 0) {
+        fitment.makes = mergeUniqueValues(fitment.makes, parts);
+        sawStructuredField = true;
+        continue;
+      }
+    }
+
     if (inYearRangeSection || looksLikeYearRangeEntry(line)) {
       const parsedRange = parseYearRangeLine(line);
       if (parsedRange) {
         fitment.year_ranges[parsedRange.label] = parsedRange.range;
         sawStructuredField = true;
         inYearRangeSection = true;
+        collectingListField = null;
         continue;
       }
     }
@@ -278,6 +310,7 @@ export function parseFitmentDeterministic(raw: string): FitmentParseResult {
     if (compatibilityEntry) {
       mergeCompatibilityVehicleLine(fitment, compatibilityEntry);
       sawStructuredField = true;
+      collectingListField = null;
       continue;
     }
 

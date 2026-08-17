@@ -4,8 +4,14 @@ import type {
   SearchProductsParams,
 } from "@/types/chat";
 
+/** Makes with fewer products than this are omitted from customer-facing make lists. */
+export const LISTED_MAKE_MIN_PRODUCTS = 2;
+
 export interface CatalogScope {
+  /** All distinct fitment makes (used for search / in-scope checks). */
   makes: string[];
+  /** Makes with enough catalog coverage to list to customers (hides one-off niche brands). */
+  listedMakes: string[];
   models: string[];
   partCategories: string[];
   summary: string;
@@ -128,9 +134,13 @@ function addUnique(target: Set<string>, value: string): void {
 /**
  * Distinct vehicle makes from parsed fitment only (`product.fitment.makes[]`).
  * Does not infer makes from titles, categories, or free text.
+ * When `minProductCount` is set, only makes appearing on at least that many products are returned.
  */
-export function extractFitmentMakes(products: CatalogProduct[]): string[] {
-  const makesByKey = new Map<string, string>();
+export function extractFitmentMakes(
+  products: CatalogProduct[],
+  options?: { minProductCount?: number },
+): string[] {
+  const makesByKey = new Map<string, { label: string; productIds: Set<number> }>();
 
   for (const product of products) {
     for (const make of product.fitment.makes) {
@@ -140,13 +150,21 @@ export function extractFitmentMakes(products: CatalogProduct[]): string[] {
       }
 
       const key = trimmed.toLowerCase();
-      if (!makesByKey.has(key)) {
-        makesByKey.set(key, trimmed);
+      const existing = makesByKey.get(key);
+      if (existing) {
+        existing.productIds.add(product.id);
+      } else {
+        makesByKey.set(key, { label: trimmed, productIds: new Set([product.id]) });
       }
     }
   }
 
-  return [...makesByKey.values()].sort((left, right) => left.localeCompare(right));
+  const minCount = options?.minProductCount ?? 1;
+
+  return [...makesByKey.values()]
+    .filter((entry) => entry.productIds.size >= minCount)
+    .map((entry) => entry.label)
+    .sort((left, right) => left.localeCompare(right));
 }
 
 function collectPartCategories(product: CatalogProduct, categories: Set<string>): void {
@@ -179,18 +197,22 @@ export function extractCatalogScope(products: CatalogProduct[]): CatalogScope {
   }
 
   const sortedMakes = extractFitmentMakes(products);
+  const listedMakes = extractFitmentMakes(products, {
+    minProductCount: LISTED_MAKE_MIN_PRODUCTS,
+  });
   const sortedModels = [...models].sort((left, right) => left.localeCompare(right));
   const sortedCategories = [...partCategories].sort((left, right) => left.localeCompare(right));
 
   const summary = [
     "Diesel Geeks specialises in diesel injector and fuel system parts for utes, 4x4s, and commercial diesels.",
-    `Vehicle makes in parsed fitment data: ${sortedMakes.join(", ") || "none indexed yet"}.`,
+    `Vehicle makes we commonly list for customers: ${listedMakes.join(", ") || "none indexed yet"}.`,
     `Representative part categories: ${sortedCategories.slice(0, 12).join(", ") || "injectors, fuel pumps, fuel lines, nozzles, SCV valves, kits"}.`,
     "We do NOT sell general workshop parts (brakes, clutches, suspension, filters, body panels, etc.) or parts for passenger cars outside our indexed makes.",
   ].join(" ");
 
   return {
     makes: sortedMakes,
+    listedMakes,
     models: sortedModels,
     partCategories: sortedCategories,
     summary,

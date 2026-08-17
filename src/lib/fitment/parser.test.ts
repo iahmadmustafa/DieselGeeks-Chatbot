@@ -94,6 +94,30 @@ Toyota LandCruiser 200 Series: 2007-2015`);
     expect(result.fitment.year_ranges.Vehicle).toEqual({ from: 2011, to: 2022 });
   });
 
+  it("parses Models label followed by an HTML bullet list", () => {
+    const result = parseFitmentDeterministic(`<b>Make</b><span style="font-weight: 400">: Nissan</span>
+<b>Models</b><span style="font-weight: 400">:</span>
+<ul>
+ 	<li style="font-weight: 400"><span style="font-weight: 400">Nissan Navara (D40)</span></li>
+ 	<li style="font-weight: 400"><span style="font-weight: 400">Nissan Pathfinder (R51)</span></li>
+ 	<li style="font-weight: 400"><span style="font-weight: 400">Nissan Murano</span></li>
+ 	<li style="font-weight: 400"><span style="font-weight: 400">X-Trail</span></li>
+</ul>
+<b>Engine Type</b><span style="font-weight: 400">: Common-Rail Diesel Engines (various)</span>
+<b>Fuel Type</b><span style="font-weight: 400">: Diesel</span>`);
+
+    expect(result.parseError).toBeNull();
+    expect(result.fitment.makes).toEqual(["Nissan"]);
+    expect(result.fitment.models).toEqual([
+      "Nissan Navara (D40)",
+      "Nissan Pathfinder (R51)",
+      "Nissan Murano",
+      "X-Trail",
+    ]);
+    expect(result.fitment.engine_codes).toEqual(["Common-Rail Diesel Engines"]);
+    expect(result.fitment.fuel_type).toBe("Diesel");
+  });
+
   it("parses singular model and engine code from HTML lists", () => {
     const result = parseFitmentDeterministic(`<ul>
 \t<li><strong>Make:</strong> Toyota</li>
