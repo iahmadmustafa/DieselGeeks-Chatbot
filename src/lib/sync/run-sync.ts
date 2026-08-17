@@ -77,8 +77,11 @@ export async function runProductSync(): Promise<SyncResult> {
   for (const wooProduct of wooProducts) {
     const fitmentRaw = wooProduct.fitment_raw;
     const contentHash = createHash("sha256").update(fitmentRaw).digest("hex");
-    const cached = await getFitmentParseCache(contentHash);
     const deterministic = parseFitmentDeterministic(fitmentRaw);
+    const deterministicOk = isDeterministicParseSufficient(deterministic);
+    // Only use Redis cache for LLM fallbacks. Always re-run deterministic so
+    // parser improvements are not stuck behind an unchanged content hash.
+    const cached = deterministicOk ? null : await getFitmentParseCache(contentHash);
 
     const job: ProductParseJob = {
       wooProduct,
@@ -90,7 +93,7 @@ export async function runProductSync(): Promise<SyncResult> {
 
     jobs.push(job);
 
-    if (!cached && !isDeterministicParseSufficient(deterministic)) {
+    if (!cached && !deterministicOk) {
       llmJobs.push(job);
     }
   }
@@ -98,8 +101,8 @@ export async function runProductSync(): Promise<SyncResult> {
   console.log("[sync] fitment parse plan", {
     product_count: jobs.length,
     cache_hits: jobs.filter((job) => job.cached).length,
-    deterministic_only: jobs.filter(
-      (job) => !job.cached && isDeterministicParseSufficient(job.deterministic),
+    deterministic_only: jobs.filter((job) =>
+      isDeterministicParseSufficient(job.deterministic),
     ).length,
     llm_fallback_queued: llmJobs.length,
     llm_concurrency: llmConcurrency,
@@ -108,11 +111,11 @@ export async function runProductSync(): Promise<SyncResult> {
   const parseResults = new Map<string, FitmentParseResult>();
 
   for (const job of jobs) {
-    if (job.cached) {
-      parseResults.set(job.contentHash, job.cached);
-    } else if (isDeterministicParseSufficient(job.deterministic)) {
+    if (isDeterministicParseSufficient(job.deterministic)) {
       parseResults.set(job.contentHash, job.deterministic);
       await setFitmentParseCache(job.contentHash, job.deterministic);
+    } else if (job.cached) {
+      parseResults.set(job.contentHash, job.cached);
     }
   }
 
